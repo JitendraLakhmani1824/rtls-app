@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "types": ["jest"],
+    "paths": {
+      "@app/*": ["./src/app/*"],
+      "@features/*": ["./src/features/*"],
+      "@managers/*": ["./src/managers/*"],
+      "@common/*": ["./src/common/*"],
+      "@core/*": ["./src/core/*"],
+      "@lab/*": ["./src/lab/*"],
+      "@testing/*": ["./src/testing/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "ios", "android"]
+}

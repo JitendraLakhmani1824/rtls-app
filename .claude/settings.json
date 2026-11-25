@@ -1,0 +1,23 @@
+{
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Bash(npm install:*)",
+      "Bash(npm i:*)",
+      "Bash(npm add:*)",
+      "Bash(yarn:*)",
+      "Bash(bun add:*)",
+      "Edit(/ios/**)",
+      "Edit(/android/**)",
+      "Write(/ios/**)",
+      "Write(/android/**)",
+      "Edit(/docs/import-rules.md)",
+      "Write(/docs/import-rules.md)",
+      "Read(/.env*)",
+      "Edit(/.env*)",
+      "Write(/.env*)"
+    ]
+  }
+}
