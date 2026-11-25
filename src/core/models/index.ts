@@ -33,8 +33,8 @@ export const PIN_STRIDE = 5;
 export type MotionFrame = { n: number; buf: Float64Array };
 export const MOTION_STRIDE = 5;
 
-/** Presence codes carried in PinFrame. Paused members are not drawn at all. */
-export const Presence = { Live: 0, Recent: 1, Stale: 2 } as const;
+/** Presence codes. Paused members are not drawn on the map, so PinFrame never carries Paused. */
+export const Presence = { Live: 0, Recent: 1, Stale: 2, Paused: 3 } as const;
 
 /** Heartbeats ("I'm still here") and pause flags. Each entry is PRESENCE_STRIDE numbers: member, heardAtMs, paused (0/1). */
 export type PresenceBatch = { n: number; buf: Float64Array };
@@ -115,6 +115,23 @@ export type Viewport = {
 };
 
 export type ConnState = { kind: 'live' | 'reconnecting' | 'offline'; sinceMs: number };
+
+/** A friend as the list and the Detail sheet show it. Plain numbers; screens format them. */
+export type FriendRow = {
+  id: number;
+  name: string;
+  initials: string;
+  colour: string;
+  /** Presence code (Presence.*). */
+  presence: number;
+  /** From me, metres; NaN when either position is unknown. */
+  distanceM: number;
+  /** From me, degrees clockwise from north; NaN when unknown. */
+  bearingDeg: number;
+  /** Since we last heard from them (fix or heartbeat), ms; NaN if never. */
+  silentMs: number;
+  speedMs: number;
+};
 
 /** Where a feed stopped, so it can resume without gaps. Opaque to everyone but the feed. */
 export type Cursor = { readonly feedPosition: number };

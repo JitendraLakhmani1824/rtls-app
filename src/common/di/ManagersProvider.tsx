@@ -32,6 +32,12 @@ export function useSelected(): number | null {
   return useSyncExternalStore(session.selected.subscribe, session.selected.get);
 }
 
+/** Every friend but me, nearest first. Re-renders at most once a second, and only where it's used. */
+export function useRows() {
+  const { session } = useManagers();
+  return useSyncExternalStore(session.rows.subscribe, session.rows.get);
+}
+
 /** Live / Reconnecting / Offline. Re-renders only when it changes. */
 export function useConnection() {
   const { session } = useManagers();

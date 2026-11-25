@@ -11,7 +11,7 @@ export const RECENT_MAX_MS = 5 * 60_000;
 /** Slower than this (m/s) is standing still: we expect heartbeats, not fixes. */
 export const MOVING_MS = 0.5;
 /** Presence code for a member who paused sharing (not drawn). */
-export const PAUSED_PRESENCE = 3;
+export const PAUSED_PRESENCE = Presence.Paused;
 
 /** How often we expect to hear from a member: their fix interval while moving, the heartbeat while still. */
 export function expectedIntervalMs(speedMs: number, fixIntervalMs: number): number {

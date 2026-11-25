@@ -3,6 +3,7 @@
 import type {
   ConnState,
   Cursor,
+  FriendRow,
   FixBatch,
   Member,
   MotionFrame,
@@ -89,6 +90,8 @@ export interface MapManager {
   /** Every trail to draw (replaces the previous frame). */
   setTrails(frame: TrailFrame): void;
   setSelected(member: number | null): void;
+  /** Animates the camera to show these bounds (degrees), leaving room for the app's controls. */
+  fitTo(west: number, south: number, east: number, north: number): void;
   /** Most gliding updates per second the map should draw; 0 = no gliding. */
   setFrameRateCap(fps: number): void;
   onPinPress(listener: (member: number) => void): Stop;
@@ -100,6 +103,11 @@ export interface Session {
   select(member: number | null): void;
   selected: Readable<number | null>;
   connection: Readable<ConnState>;
+  /**
+   * Every friend but me, nearest first. Updated at most once a second, and only while something
+   * subscribes; unchanged otherwise.
+   */
+  rows: Readable<FriendRow[]>;
 }
 
 // ── Measurement (no-op in production) ───────────────────────────────────────────

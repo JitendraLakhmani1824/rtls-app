@@ -32,6 +32,11 @@ import type { MapViewModel, MemberTable, TrailTip } from './viewModel';
 
 const FONT = ['Noto Sans Bold']; // the only glyphs OpenFreeMap serves
 const CLUSTER_MAX_ZOOM = 15;
+/** Pins group only when they would overlap (a pin is ~18 points wide), so a small group stays individual. */
+const PIN_GROUP_RADIUS = 20;
+/** Room for the app's controls when fitting friends into view: the badge on top, panel and sheet below. */
+const CAMERA_PADDING = { top: 120, right: 48, bottom: 260, left: 48 };
+const CAMERA_MS = 600;
 
 type PressEvent = Parameters<NonNullable<GeoJSONSourceProps['onPress']>>[0];
 const ignore = () => {}; // feature-state calls fail harmlessly before the source is on the map
@@ -47,7 +52,13 @@ export function createMapView(model: MapViewModel): ComponentType {
 function MapLibreView({ model }: { model: MapViewModel }) {
   const cameraRef = useRef<CameraRef>(null);
   const fps = useSyncExternalStore(model.mapFps.subscribe, model.mapFps.get);
+  const command = useSyncExternalStore(model.cameraCommand.subscribe, model.cameraCommand.get);
   useEffect(() => () => model.handleReady(false), [model]);
+  useEffect(() => {
+    const camera = cameraRef.current;
+    if (!camera || !command) return;
+    camera.fitBounds(command.bounds, { padding: CAMERA_PADDING, duration: CAMERA_MS });
+  }, [command]);
 
   const onRegion = (gesturing: boolean) => (e: { nativeEvent: ViewStateChangeEvent }) => {
     const { bounds, zoom, userInteraction } = e.nativeEvent;
@@ -150,7 +161,7 @@ function StillPins({
       ref={sourceRef}
       data={data}
       cluster
-      clusterRadius={40}
+      clusterRadius={PIN_GROUP_RADIUS}
       clusterMaxZoom={CLUSTER_MAX_ZOOM}
       onPress={onPress}
     >
@@ -220,7 +231,6 @@ function StillPins({
       <Layer
         id="still-initials"
         type="symbol"
-        minzoom={CLUSTER_MAX_ZOOM}
         filter={['!', ['has', 'point_count']]}
         layout={{
           'text-field': ['get', 't'],

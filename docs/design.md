@@ -467,12 +467,8 @@ stateDiagram-v2
   - `onState` → publish `connection` immediately.
   - `onSessionEnded` → stop and show "Session ended".
 - **Pin taps.** The session listens to `map.onPinPress` and calls `select(id)`. Screens only react to `selected`.
-- **Camera modes:**
-  - *Fit* (default) re-fits only when a member leaves the padded bounds.
-  - *Follow* re-centres when the friend moves > 10% of the view.
-  - *Me* centres once on my position.
-  - Any user gesture switches to *Free*.
-- **Lazy snapshot.** `rows`, `selected` and `connection` are separate readables. Each is computed on the tick only while something subscribes to it; unchanged parts keep their object identity.
+- **Camera:** frames every friend at start, and again only when someone leaves the view. Any user gesture hands the camera to the user for the rest of the session. No camera buttons: the brief doesn't need them.
+- **Lazy snapshot.** `rows`, `selected` and `connection` are separate readables. `rows` is computed at most once per tick, only when read, and subscribers hear about it only while subscribed.
 
 ## 2.5 Map (`managers/map`)
 
@@ -514,14 +510,14 @@ stateDiagram-v2
 - **Shape:** `XScreen` wires `useX()` to views. `useX` is the only file that uses `useManagers()` and navigation, and returns data + actions. Function components only; the one class is `ErrorBoundary`.
 - **Snapshot hooks:** `useRows()`, `useSelected()`, `useConnection()` — `useSyncExternalStore` over the session's readables. Nothing subscribes to per-frame data. The friend list mounts only when the panel is expanded, so collapsed means `rows` is never computed.
 - **Text:** the snapshot carries distance and bearing from me, and age, as numbers; rows arrive sorted by distance. `common/utils` formats "350 m NE" and "updated 10 s ago".
-- **Home:** full-screen `MapView`, friend list panel (fixed-height rows), camera buttons, connection badge. Tapping a row calls `session.select(id)`. When `selected` becomes non-null, `useHome` navigates to `Friend`.
+- **Home:** full-screen `MapView`, connection badge, friend list panel (fixed-height rows, mounted only while open). Tapping a row calls `session.select(id)`. When `selected` becomes non-null, `useHome` navigates to `Friend`.
 - **Detail:** React Navigation native-stack screen `Friend`:
   - `presentation: 'formSheet'`;
   - at most three fixed `sheetAllowedDetents`;
   - `sheetLargestUndimmedDetentIndex` set, so the map stays undimmed and touchable;
   - `contentStyle.backgroundColor` set.
 
-  It shows status, last seen, distance + direction, and a Follow button. `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
+  It shows status, last seen, distance + direction and movement. `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
 - **Fallback:** if the M0 sheet check fails on Android, the detail card renders inside Home's panel.
 - **Launch parameters:** `app/launch-params.ts` reads a deep link (`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&rung=D&faults=drops,jumps`) or the dev scenario picker and builds the container from it. The ladder rung is fixed at launch, so production code never checks it.
 - **Layout:** portrait only. Layout reads window size, never screen size.

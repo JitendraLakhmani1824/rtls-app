@@ -242,4 +242,68 @@ describe('LiveSession', () => {
       expect(map.movingFrames.length - before).toBeGreaterThanOrEqual(3);
     });
   });
+
+  describe('friend rows', () => {
+    it('lists everyone but me, nearest first, paused friends last', () => {
+      const { device, feed, session, t0 } = setup();
+      session.start();
+      feed.members(fakeMembers(4));
+      feed.fixes(
+        [0, 1, 72, 19, t0],
+        [1, 1, 72, 19.01, t0],
+        [2, 1, 72, 19.001, t0],
+        [3, 1, 72, 19.0005, t0],
+      );
+      feed.presence([3, t0, 1]);
+      device.clock.advance(1000);
+      const rows = session.rows.get();
+      expect(rows.map((r) => r.id)).toEqual([2, 1, 3]);
+      expect(rows[0]?.distanceM).toBeCloseTo(111, 0);
+      expect(rows[0]?.bearingDeg).toBeCloseTo(0, 0);
+      expect(rows[2]?.presence).toBe(Presence.Paused);
+    });
+
+    it('tells subscribers once a tick, and only while someone subscribes', () => {
+      const { device, feed, session, t0 } = setup();
+      session.start();
+      feed.members(fakeMembers(2));
+      feed.fixes([1, 1, 72, 19, t0]);
+      let calls = 0;
+      const stop = session.rows.subscribe(() => calls++);
+      device.clock.advance(3000);
+      expect(calls).toBe(3);
+      stop();
+      device.clock.advance(3000);
+      expect(calls).toBe(3);
+    });
+  });
+
+  describe('camera', () => {
+    it('frames everyone once friends appear', () => {
+      const { device, feed, map, session, t0 } = setup();
+      session.start();
+      feed.members(fakeMembers(3));
+      feed.fixes([1, 1, 72, 19, t0], [2, 1, 72.01, 19.02, t0]);
+      device.clock.advance(1000);
+      expect(map.fits).toEqual([[72, 19, 72.01, 19.02]]);
+      device.clock.advance(1000);
+      expect(map.fits).toHaveLength(1); // no re-fit while everyone is in view
+    });
+
+    it('re-frames when a friend leaves the view, until the user moves the map', () => {
+      const { device, feed, map, session, t0 } = setup();
+      map.viewport.set(view(15));
+      session.start();
+      feed.members(fakeMembers(2));
+      feed.fixes([1, 1, 72, 19, t0]);
+      device.clock.advance(1000);
+      feed.fixes([1, 2, 72.02, 19, t0 + 600_000]); // ten minutes later, out of the view
+      device.clock.advance(1000);
+      expect(map.fits).toHaveLength(2);
+      map.viewport.set(view(15, true)); // the user pans
+      feed.fixes([1, 3, 72.04, 19, t0 + 1_200_000]);
+      device.clock.advance(1000);
+      expect(map.fits).toHaveLength(2);
+    });
+  });
 });

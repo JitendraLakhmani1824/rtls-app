@@ -15,7 +15,7 @@ import { makeMutable } from 'react-native-reanimated';
 import { EMPTY_FC, encodeTrails, haloPoints, StillEncoder, trailTipFrom } from './encode';
 import positron from '../../../assets/map-style/positron.json';
 import { createMapView } from './MapView';
-import type { MapViewModel, MemberTable, MotionInput, TrailTip } from './viewModel';
+import type { CameraCommand, MapViewModel, MemberTable, MotionInput, TrailTip } from './viewModel';
 
 /** Gliding pins update at most this often (≈ 33×/s): each update is a source re-parse. */
 const MIN_GLIDE_FRAME_MS = 30;
@@ -41,6 +41,7 @@ export class MapLibreManager implements MapManager, MapViewModel {
   readonly viewport = createStore<Viewport | null>(null);
   readonly stillData = createStore(EMPTY_FC);
   readonly selection = createStore<number | null>(null);
+  readonly cameraCommand = createStore<CameraCommand | null>(null);
   readonly trailData = createStore(EMPTY_FC);
   readonly mapFps = createStore(60);
   readonly motion = makeMutable<MotionInput>({ version: 0, entries: [] });
@@ -108,6 +109,11 @@ export class MapLibreManager implements MapManager, MapViewModel {
   setFrameRateCap(fps: number) {
     this.glideFrameMs.value = fps > 0 ? Math.max(MIN_GLIDE_FRAME_MS, 1000 / fps) : Infinity;
     this.mapFps.set(Math.max(MIN_MAP_FPS, fps));
+  }
+
+  fitTo(west: number, south: number, east: number, north: number) {
+    const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
+    this.cameraCommand.set({ seq, bounds: [west, south, east, north] });
   }
 
   setSelected(member: number | null) {

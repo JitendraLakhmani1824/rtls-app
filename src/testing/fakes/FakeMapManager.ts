@@ -25,6 +25,8 @@ export class FakeMapManager implements MapManager {
   readonly trailFrames: TrailPart[][] = [];
   /** Every frame-rate cap the map was given. */
   readonly frameRateCaps: number[] = [];
+  /** Every fitTo, as [west, south, east, north]. */
+  readonly fits: number[][] = [];
   private pressListeners = new Set<(member: number) => void>();
 
   setMembers(members: Member[]) {
@@ -49,6 +51,9 @@ export class FakeMapManager implements MapManager {
         ),
       })),
     );
+  }
+  fitTo(west: number, south: number, east: number, north: number) {
+    this.fits.push([west, south, east, north]);
   }
   setFrameRateCap(fps: number) {
     this.frameRateCaps.push(fps);

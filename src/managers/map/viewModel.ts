@@ -9,6 +9,12 @@ import type { SharedValue } from 'react-native-reanimated';
  */
 export type MotionInput = { version: number; entries: number[] };
 export type MemberTable = { colours: string[]; initials: string[] };
+/** "Show these bounds", from the session; `seq` makes a repeated request a new value. */
+export type CameraCommand = {
+  seq: number;
+  bounds: [west: number, south: number, east: number, north: number];
+};
+
 /** Where the selected friend's drawn trail ends; the worklet joins it to the gliding pin. */
 export type TrailTip = { version: number; lng: number; lat: number };
 
@@ -17,6 +23,7 @@ export interface MapViewModel {
   readonly initialView: { center: [number, number]; zoom: number };
   readonly mapStyle: StyleSpecification;
   readonly stillData: Store<string>;
+  readonly cameraCommand: Store<CameraCommand | null>;
   /** The selected member, for the still pins' feature state. */
   readonly selection: Store<number | null>;
   readonly trailData: Store<string>;
