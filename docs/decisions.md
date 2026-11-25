@@ -4,6 +4,7 @@ Short log of choices made after the plan was closed. Newest first.
 
 | Date | Decision | Why | Cost / revisit when |
 | --- | --- | --- | --- |
+| 2026-11-26 | `MotionFrame` = target + duration (4 numbers), not start/end timestamps (7) | M0 showed the UI thread and JS run on different clocks; with durations the renderer starts each glide from where it draws the pin, on its own clock — no clock mapping, works for a future native renderer too | — |
 | 2026-11-26 | Reference phone: OnePlus 10T (Snapdragon 8+ Gen 1, Android 15); Android builds use Android Studio's bundled JDK 17 (`JAVA_HOME`) | The phone available for measurement; React Native's Android build needs JDK 17 and the system Java is 22 | Upper-end chip flatters the numbers, so the README says so. A mid-range run would strengthen the results |
 | 2026-11-26 | Expo project `@harrylakhmani/rtls` (ID `eb8cce8b-…`), owner set in `app.config.ts`; `eas.json` profiles `development` and `preview` | Builds and share links come from EAS | — |
 | 2026-11-26 | ESLint pinned to 9.x | `eslint-config-expo` 58 bundles `eslint-plugin-react`, which crashes on ESLint 10 (`context.getFilename` removed) | Move to 10 when Expo's config supports it |

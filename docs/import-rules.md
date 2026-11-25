@@ -15,7 +15,7 @@ An import is allowed only if one of these rules allows it. Anything else fails `
 | `features-common` | features/* may import common/*. |
 | `features-libraries` | features/* may import React, React Native, React Navigation, safe-area, Reanimated and Gesture Handler. |
 | `managers-core` | managers/* may import core/protocols, core/models and core/utils. |
-| `managers-map-libraries` | managers/map is the only folder that may import MapLibre (plus React, React Native and the bundled map style). |
+| `managers-map-libraries` | managers/map is the only folder that may import MapLibre (plus React, React Native, Reanimated and the bundled map style). |
 | `managers-device-libraries` | managers/device is the only folder that may import expo-battery and modules/rtls-thermal (plus React Native). |
 | `common-core` | common/* may import core/protocols, core/models and core/utils. |
 | `common-ui-utils` | common/ui may import common/utils. |

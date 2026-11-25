@@ -45,3 +45,6 @@ coverage/
 
 # local Claude Code settings
 .claude/settings.local.json
+
+# Claude Code hook state
+.claude/.state/

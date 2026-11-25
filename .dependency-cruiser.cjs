@@ -69,10 +69,10 @@ module.exports = {
     },
     {
       comment:
-        'managers-map-libraries — managers/map is the only folder that may import MapLibre (plus React, React Native and the bundled map style).',
+        'managers-map-libraries — managers/map is the only folder that may import MapLibre (plus React, React Native, Reanimated and the bundled map style).',
       from: { path: '^src/managers/map/' },
       to: {
-        path: `(?:${npm(...REACT, '@maplibre/maplibre-react-native', 'geojson')}|^assets/map-style/)`,
+        path: `(?:${npm(...REACT, '@maplibre/maplibre-react-native', 'geojson', 'react-native-reanimated', 'react-native-worklets')}|^assets/map-style/)`,
       },
     },
     {

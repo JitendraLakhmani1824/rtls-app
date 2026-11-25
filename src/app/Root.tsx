@@ -1,31 +1,41 @@
-import { SpikeScreen, SpikeSheet, type SpikeStack } from '@lab/spike';
+import { ManagersProvider } from '@common/di';
+import { RungAScreen } from '@lab/ladder';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// M0: the app opens the map spike. Home and Detail replace it from M1.
-const Stack = createNativeStackNavigator<SpikeStack>();
+import { createContainer, VENUE } from './container';
+import { paramsKey, useLaunchParams, type LaunchParams } from './launch-params';
+import { AppNavigation } from './navigation';
 
 export function Root() {
+  const params = useLaunchParams();
+  if (!params) return null;
+  // A new scenario link rebuilds everything from scratch (the key changes).
+  if (params.rung === 'A') {
+    return (
+      <RungAScreen
+        key={paramsKey(params)}
+        friends={params.friends}
+        seed={params.seed}
+        intervalMs={params.intervalMs}
+        center={VENUE}
+      />
+    );
+  }
+  return <AppShell key={paramsKey(params)} params={params} />;
+}
+
+function AppShell({ params }: { params: LaunchParams }) {
+  const [container] = useState(() => createContainer(params));
+  useEffect(() => container.start(), [container]);
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator>
-          <Stack.Screen name="Spike" component={SpikeScreen} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="SpikeSheet"
-            component={SpikeSheet}
-            options={{
-              headerShown: false,
-              presentation: 'formSheet',
-              sheetAllowedDetents: [0.3, 0.6],
-              sheetLargestUndimmedDetentIndex: 'last', // map stays undimmed and touchable
-              sheetGrabberVisible: true,
-              contentStyle: { backgroundColor: '#ffffff' },
-            }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ManagersProvider value={container.screens}>
+        <NavigationContainer>
+          <AppNavigation />
+        </NavigationContainer>
+      </ManagersProvider>
     </SafeAreaProvider>
   );
 }

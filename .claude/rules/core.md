@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/core/**"
+  - 'src/core/**'
 ---
 
 # Rules for src/core

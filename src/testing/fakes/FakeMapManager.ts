@@ -1,0 +1,62 @@
+import {
+  MOTION_STRIDE,
+  PIN_STRIDE,
+  type Member,
+  type MotionFrame,
+  type PinFrame,
+  type Viewport,
+} from '@core/models';
+import type { MapManager, Stop } from '@core/protocols';
+import { createStore } from '@core/utils';
+
+/** A map that records what it was told. Frames are copied (senders reuse their buffers). */
+export class FakeMapManager implements MapManager {
+  readonly ready = createStore(true);
+  readonly viewport = createStore<Viewport | null>(null);
+  members: Member[] = [];
+  selected: number | null = null;
+  /** Each still frame as [member, lng, lat, presence] rows. */
+  readonly stillFrames: number[][][] = [];
+  /** Each motion frame as [member, lng, lat, durationMs] rows. */
+  readonly movingFrames: number[][][] = [];
+  private pressListeners = new Set<(member: number) => void>();
+
+  setMembers(members: Member[]) {
+    this.members = members;
+  }
+  setStill(frame: PinFrame) {
+    this.stillFrames.push(rows(frame, PIN_STRIDE));
+  }
+  setMoving(frame: MotionFrame) {
+    this.movingFrames.push(rows(frame, MOTION_STRIDE));
+  }
+  setSelected(member: number | null) {
+    this.selected = member;
+  }
+  onPinPress(listener: (member: number) => void): Stop {
+    this.pressListeners.add(listener);
+    return () => {
+      this.pressListeners.delete(listener);
+    };
+  }
+
+  /** Simulates the user tapping a pin. */
+  pressPin(member: number) {
+    this.pressListeners.forEach((l) => l(member));
+  }
+  setReady(ready: boolean) {
+    this.ready.set(ready);
+  }
+  get lastStill() {
+    return this.stillFrames[this.stillFrames.length - 1];
+  }
+  get lastMoving() {
+    return this.movingFrames[this.movingFrames.length - 1];
+  }
+}
+
+function rows(frame: { n: number; buf: Float64Array }, stride: number): number[][] {
+  return Array.from({ length: frame.n }, (_, i) =>
+    Array.from(frame.buf.subarray(i * stride, (i + 1) * stride)),
+  );
+}

@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/features/**"
+  - 'src/features/**'
 ---
 
 # Rules for screens (src/features)

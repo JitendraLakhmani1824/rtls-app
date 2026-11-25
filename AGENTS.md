@@ -2,14 +2,14 @@
 
 Live location sharing for events: friends' pins and short trails on one map — smooth with hundreds of people on screen, cheap on battery. A case study (Principal Engineer, Mobile). Expo SDK 58 · React Native 0.88 (New Architecture) · TypeScript · MapLibre.
 
-**Status:** M0 — the app opens a map spike (`src/lab/spike`). Real screens arrive in M1–M5 (`docs/plan.md` §7).
+**Status:** M1 — the app opens the live map: synthetic feed → `LiveSession` → MapLibre (still pins ≤ 1×/s, gliding pins on the UI thread). Friend list, Detail sheet, trails and battery work arrive in M2–M5 (`docs/plan.md` §7).
 
-| Read | For |
-| --- | --- |
-| `docs/prd.md` | What we build |
-| `docs/design.md` | How it works (HLD + LLD) — the source of truth for the engine, map and battery |
-| `docs/plan.md` | Stack, rules, milestones |
-| `docs/import-rules.md` | Who may import whom (generated — never edit by hand) |
+| Read                   | For                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| `docs/prd.md`          | What we build                                                                  |
+| `docs/design.md`       | How it works (HLD + LLD) — the source of truth for the engine, map and battery |
+| `docs/plan.md`         | Stack, rules, milestones                                                       |
+| `docs/import-rules.md` | Who may import whom (generated — never edit by hand)                           |
 
 ## Commands
 

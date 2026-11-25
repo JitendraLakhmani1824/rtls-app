@@ -2,7 +2,7 @@
 
 Real-time location sharing for events · Principal Engineer (Mobile) case study · Draft v0.2, 2026-11-26
 
-Status: **LLD drafted; HLD outlined** (written in M1). Numbers marked *target* are not measured yet; §2.10 fills in as milestones land.
+Status: **HLD written (design only — no server is built); LLD drafted.** Numbers marked *target* or *estimate* are not measured; §2.10 fills in as milestones land.
 
 ---
 
@@ -12,22 +12,229 @@ Status: **LLD drafted; HLD outlined** (written in M1). Numbers marked *target* a
 
 ---
 
-# Part 1 — HLD (outline)
+# Part 1 — HLD
 
-| # | Section | Will cover |
+The whole system. Only the app is built; the server side is a design, and the app's synthetic feed stands in for it behind the same `FeedManager` protocol.
+
+## 1.1 Requirements
+
+| | |
+| --- | --- |
+| **Do** | Friends in a time-boxed session see each other's live pins and a short trail of recent movement on one map |
+| **Latency** | A friend's pin starts moving ≤ 5 s (p95) after their phone publishes, while someone is watching (Live mode) |
+| **Battery** | A sharing phone spends radio and GPS only when someone is watching; a viewing phone does no work while the map is hidden |
+| **Scale** | Hundreds of friends on one map; events with tens of thousands of sharers |
+| **Privacy** | Sharing exists only inside a session, stops on its own, and is deleted at session end |
+
+## 1.2 Scale estimate (*estimate*)
+
+Marathon: 40,000 runners, 30% sharing → **12,000 sharers**. Assume 30% are watched at any moment (Live) and 70% are not (Idle).
+
+| Flow | Calculation | Rate |
 | --- | --- | --- |
-| 1.1 | Requirements | Live pins + trails; pin starts moving ≤ 5 s after a publish (p95, Live mode); battery-light; many users per map |
-| 1.2 | Scale estimate | Marathon: 40k runners, 30% sharing, 1 fix / 5 s → ~2.4k uploads/s, ~4–5k fan-out msgs/s, < 1 MB/s; gateways are connection-bound |
-| 1.3 | Architecture | Diagram: sharer phone → Ingest API (HTTPS) → pub/sub (per-session topics) → Realtime gateway (WebSocket) → viewer phone; hot store (latest + trails, TTL); Postgres (users, sessions); APNs/FCM |
-| 1.4 | Key flows | Three sequence diagrams: **open the map** (snapshot, then deltas) · **a watcher appears** (sharer switches Idle → Live) · **reconnect** (resume from cursor, no gaps) |
-| 1.5 | Wire format | WebSocket messages (subscribe, snapshot, fix batch, presence, state, session ended) and upload request / reply (`ServerHint`) as tables; protocol version field |
-| 1.6 | Protocols | WebSocket for open maps, HTTPS for background uploads, push only to wake; SSE and MQTT considered |
-| 1.7 | Battery (system) | Watcher-aware sending; per-viewer coalescing; viewport-aware fan-out |
-| 1.8 | Scaling | Gateways scale out; topic per session; hot store with expiry; backpressure |
-| 1.9 | Failures | Offline phones, gateway loss, duplicates / reordering, clock skew |
-| 1.10 | Observability | Stutter rate, feed lag, upload success, battery per hour by mode — without logging coordinates |
-| 1.11 | Security and privacy | Who may join a session, token on the socket, session-scoped sharing, auto-stop, deletion at session end |
-| 1.12 | Trade-offs | What we chose, what we gave up, what we'd revisit |
+| Live uploads | 3,600 sharers × 1 fix / 4 s | ~900 req/s, ~900 fixes/s |
+| Idle uploads | 8,400 sharers × 1 batch / 60 s (4 fixes each) | ~140 req/s, ~560 fixes/s |
+| **Ingest total** | | **~1,040 req/s, ~1,500 fixes/s** |
+| Fan-out | 900 Live fixes/s × ~2 open maps each, coalesced per viewer | ~1,800 msgs/s |
+| Bandwidth out | 1,800 msgs/s × ~60 bytes | **~110 KB/s** |
+| Open WebSockets | Viewers with the map open | ~5,000–10,000 |
+
+Throughput is small. **The gateway is sized by open connections, not messages** — one or two well-tuned nodes for this event, scaled out by connection count for bigger ones.
+
+## 1.3 Architecture
+
+```mermaid
+flowchart LR
+  S["Sharer phone<br/>(sharing rules, batching)"] -- "HTTPS POST fixes<br/>reply: watchers, next interval" --> I["Ingest API<br/>(stateless)"]
+  I --> B[("Pub/sub<br/>topic per session")]
+  I --> H[("Hot store (Redis)<br/>latest fix · trail · watchers<br/>expires with the session")]
+  B --> G["Realtime gateway<br/>(WebSocket, per-viewer coalescing)"]
+  G -- "WebSocket: members, fixes,<br/>presence, session ended" --> V["Viewer phone<br/>(map open)"]
+  V -- "subscribe · viewport" --> G
+  G --> H
+  A["Session API<br/>(users, friends, invites)"] --> P[("Postgres")]
+  V -- "HTTPS snapshot" --> A
+  A --> H
+  W["Push (APNs / FCM)"] -. "wake: someone is watching" .-> S
+  G -. "watcher 0 → 1" .-> W
+```
+
+| Component | Job |
+| --- | --- |
+| **Ingest API** | Authenticates the upload, checks session membership, orders fixes by per-member sequence, drops impossible jumps, writes latest + trail to the hot store, publishes to the session topic, and replies with a `ServerHint` (watchers, next interval, session end) |
+| **Pub/sub** (NATS or Redis Streams) | One topic per session. Keeps the last ~2 minutes so a reconnecting viewer can resume from its cursor |
+| **Realtime gateway** | Holds viewers' WebSockets. Subscribes only to sessions it has viewers for. Coalesces per viewer (latest fix per friend wins, ≤ 1 message per friend per second), filters by viewport, and records who is watching whom |
+| **Hot store** | Latest fix and recent trail per member, watcher counts. Every key expires when the session ends |
+| **Session API + Postgres** | Users, friendships, sessions, members, invites; the map-open snapshot |
+| **Push** | Only to wake an Idle sharer when someone starts watching — never for location data |
+
+## 1.4 Key flows
+
+**Open the map** — snapshot first, then live changes:
+
+```mermaid
+sequenceDiagram
+  participant V as Viewer phone
+  participant A as Session API
+  participant G as Gateway
+  participant H as Hot store
+  V->>A: GET /v1/sessions/{id}/snapshot
+  A->>H: latest fixes + trails
+  A-->>V: members, fixes, trails, cursor
+  V->>G: hello {token} · subscribe {session, cursor, viewport}
+  G->>H: add V as watcher of the session's members
+  loop while the map is visible
+    G-->>V: fixes / presence (latest-wins, ≤ 1 per friend per s)
+    V->>G: viewport (throttled while panning)
+  end
+  V->>G: unsubscribe (map hidden or app backgrounded)
+```
+
+**A watcher appears** — an Idle sharer switches to Live:
+
+```mermaid
+sequenceDiagram
+  participant V as Viewer phone
+  participant G as Gateway
+  participant W as Push
+  participant S as Sharer phone (Idle)
+  participant I as Ingest API
+  V->>G: subscribe (session)
+  G->>G: watchers of S: 0 → 1
+  G->>W: wake S
+  W-->>S: background push
+  S->>I: POST fixes (now, instead of waiting ≤ 60 s)
+  I-->>S: ServerHint {watchers: 1, nextIntervalMs: 4000}
+  S->>S: Live: send each fix every 3–5 s
+  Note over S,I: If the push is lost, the next Idle upload's reply carries the same hint — worst case one Idle interval
+```
+
+**Reconnect** — no gaps, no full reload unless needed:
+
+```mermaid
+sequenceDiagram
+  participant V as Viewer phone
+  participant G as Gateway
+  participant A as Session API
+  V--xG: connection drops
+  V->>V: show "Reconnecting", keep last positions
+  V->>G: reconnect after backoff + jitter · subscribe {cursor}
+  alt cursor still in the topic's 2-minute window
+    G-->>V: missed batches, then live
+  else cursor too old
+    G-->>V: resync
+    V->>A: GET snapshot
+  end
+```
+
+## 1.5 Wire format
+
+JSON text frames, compact arrays, an envelope `{"v": 1, "t": "<type>", …}`. JSON rather than protobuf because React Native's WebSocket delivers binary frames as base64 that JavaScript then decodes, which costs more than parsing small JSON. Coordinates are integers × 10⁶ (~0.1 m); times are milliseconds since the batch's base time.
+
+**WebSocket, client → server**
+
+| `t` | Fields | Notes |
+| --- | --- | --- |
+| `hello` | `token`, `app` (version) | First frame; the token is never in the URL |
+| `subscribe` | `session`, `cursor?`, `viewport` `[w,s,e,n,zoom]` | One per open session map |
+| `viewport` | `session`, `viewport` | Throttled; drives viewport-aware fan-out |
+| `unsubscribe` | `session` | Map hidden or app backgrounded |
+| `ping` | — | Every 25 s, only while connected |
+
+**WebSocket, server → client**
+
+| `t` | Fields | Notes |
+| --- | --- | --- |
+| `welcome` | `serverTime` | Lets the client track clock offset |
+| `members` | `session`, `m: [[id, key, name, initials, colour], …]` | `id` is a dense per-session index |
+| `fixes` | `session`, `cursor`, `base`, `f: [[member, seq, lng6, lat6, dt, acc], …]` | Per viewer, latest-wins |
+| `presence` | `session`, `p: [[member, lastHeardMs, paused], …]` | Heartbeats without movement |
+| `resync` | `session` | Cursor too old: fetch the snapshot |
+| `sessionEnded` | `session`, `at` | Pins fade; sharing stops |
+| `error` | `code`, `message` | e.g. `unauthorised`, `not-a-member`, `version` |
+
+**Upload: `POST /v1/sessions/{id}/fixes`**
+
+| | Body |
+| --- | --- |
+| Request | `{"v":1, "fixes":[[seq, lng6, lat6, tMs, acc, speed, heading], …], "battery":{"level":0.62, "lowPower":false}}` |
+| `200` | `{"v":1, "watchers":2, "nextIntervalMs":4000, "mode":"live", "sessionEndsAt":1764190800000}` (`ServerHint`) |
+| `410` | Session ended — stop sharing |
+| `429` | Too many uploads — honour `Retry-After` |
+
+**Versioning:** every message carries `v`. The server accepts the current and previous major; within a major, changes are additive and unknown fields are ignored.
+
+## 1.6 Protocol choices
+
+| Need | Choice | Why |
+| --- | --- | --- |
+| Live updates to an open map | **WebSocket** | Two-way (viewport, subscribe), server push, one connection for many sessions |
+| Uploads from a backgrounded phone | **HTTPS POST** | Short requests fit iOS/Android background limits and batch naturally; each reply carries the watcher hint, so no separate downlink is needed |
+| Waking an Idle sharer | **Push (APNs/FCM)** | Only to speed up the Idle → Live switch; correctness never depends on it |
+| *Considered:* SSE | — | Server → client only, no built-in React Native support; uploads would still need HTTPS |
+| *Considered:* MQTT | — | Retained messages and last-will fit presence, but per-viewer coalescing, viewport filtering and watcher counting need custom server logic anyway; on mobile it runs over WebSocket regardless |
+
+## 1.7 Battery — the system's part
+
+| Lever | Where |
+| --- | --- |
+| **Watcher-aware sending:** Live (3–5 s) only while someone watches; Idle (≥ 60 s batches) otherwise | Gateway counts watchers; Ingest replies carry the hint |
+| No keep-alive for sharers: the upload reply is the heartbeat channel | Ingest API |
+| Per-viewer coalescing: latest fix per friend wins, ≤ 1/s | Gateway |
+| Viewport-aware fan-out: friends near the viewport stream; off-screen friends every ~10 s (enough for list distances) | Gateway |
+| Viewers unsubscribe the moment the map is hidden | Viewer app |
+
+The phone's side (GPS profiles, radio tail, iOS/Android limits) is §2.7.
+
+## 1.8 Scaling
+
+- **Ingest API:** stateless, behind a load balancer; scales on CPU.
+- **Gateway:** scales on open connections. No sticky routing — any node subscribes to the topics of sessions it has viewers for. Per-connection send queues are capped; when a viewer falls behind, older fixes for the same friend are dropped (latest-wins), and persistently slow consumers are disconnected and resync.
+- **Hot store:** keys partitioned by session; latest fix as a hash per session, trail as a capped stream per session (members × ~120 points), watcher sets with expiry. Every key's lifetime is the session's.
+- **Postgres:** only slow-changing data (users, sessions, invites); never written per fix.
+- **Big single sessions** (a 5,000-member run club): viewport filtering and coalescing keep each viewer's stream bounded by what's on screen, not by session size.
+
+## 1.9 Failures
+
+| Failure | Behaviour |
+| --- | --- |
+| Sharer offline | Phone buffers fixes (bounded) and uploads when back; viewers see Live → Recent → Stale by last-heard time |
+| Push lost | The next Idle upload's reply carries the hint: worst case one Idle interval |
+| Gateway node dies | Clients reconnect with backoff + jitter and resume from their cursor |
+| Pub/sub window exceeded | Gateway sends `resync`; client refetches the snapshot |
+| Hot store failover | Snapshot rebuilds from the next uploads; trails may be short for a minute |
+| Duplicates / reordering | Per-member `seq` — older or equal is dropped, on the server and again on the phone |
+| Clock skew | Server stamps receive time; `welcome.serverTime` gives the client its offset |
+| Session end while offline | Server stops fan-out; the phone stops sharing by its own clock too |
+
+## 1.10 Observability
+
+No coordinates in any log, metric or crash report.
+
+| Side | Signals |
+| --- | --- |
+| **App** (aggregated, sampled) | Map frame gaps p95 and stutter rate; JS busy %; feed lag (render time − server time); reconnects per hour; upload success rate; battery % per hour by mode; Live vs Idle time split |
+| **Server** | Ingest req/s and p95 latency; fan-out lag p95; coalesced (dropped) fixes; connections per gateway node; watchers per session; resync rate; push wake → first Live upload delay |
+| **Tracing** | One ID per upload batch through Ingest → pub/sub → gateway |
+
+## 1.11 Security and privacy
+
+- **Auth:** short-lived JWT plus refresh. Uploads carry it in a header; WebSockets in the first `hello` frame, never in the URL.
+- **Membership checks** on every subscribe and upload; invites are signed, expiring links.
+- **Rate limits** per device and per session.
+- **TLS** everywhere.
+- **Data minimisation:** only session members see each other. Trails and latest positions expire with the session (+ a short grace period); no location history beyond that.
+- **Sharing always ends:** the server stops fan-out at session end, and the phone stops on its own clock even if offline.
+
+## 1.12 Trade-offs
+
+| Chose | Over | Gave up | Revisit when |
+| --- | --- | --- | --- |
+| WebSocket + HTTPS uploads | MQTT | Retained/last-will for free | A managed broker with server-side hooks becomes cheaper to run |
+| JSON frames | Protobuf | ~30–40% bytes | A native WebSocket decoder exists in the app (§2.8) |
+| Latest-wins coalescing | Every fix delivered | Intermediate points on viewers' trails between snapshots | Trails need full fidelity (e.g. a race replay) |
+| Watcher-aware Live/Idle | Constant rate | Up to one Idle interval of delay when someone starts watching | Users expect instant first position (then: shorter Idle interval) |
+| Session-scoped data, deleted at end | History | "Where did we go?" after the event | A product decision says otherwise |
 
 ---
 
@@ -165,7 +372,7 @@ type ServerHint = { watchers: number; nextIntervalMs: number; sessionEndsAt: num
 | `FixBatch` | `{ n, buf: Float64Array }`, 6 per fix | `member, seq, lng, lat, tMs, accuracyM`; `seq` per member, assigned by the server |
 | `PresenceBatch` | `{ n, buf }`, 3 per entry | `member, lastHeardMs, paused (0/1)` |
 | `PinFrame` | `{ n, buf }`, 4 per pin | `member, lng, lat, presence` (0 live, 1 recent, 2 stale) |
-| `MotionFrame` | `{ n, buf }`, 7 per pin | `member, lng0, lat0, t0, lng1, lat1, t1` — a movement segment |
+| `MotionFrame` | `{ n, buf }`, 4 per pin | `member, lng, lat, durationMs` — "glide to here over this long, from wherever the pin is drawn now". The frame lists the whole gliding set. Durations, not timestamps, so the renderer animates on its own clock (UI thread or native) |
 | `TrailFrame` | `{ n, offsets: Uint32Array, coords: Float64Array }` | Per member: points `lng, lat, ageBucket`; `offsets` mark where each member starts |
 | `Viewport` | `{ west, south, east, north, zoom, gesturing }` | From map region events |
 | `ConnState` | `{ kind: 'live' \| 'reconnecting' \| 'offline', sinceMs }` | Owned by the feed |
@@ -213,8 +420,8 @@ Inputs: store, viewport, selection, budget, `now`. Outputs: what to send to the 
    - **Below the cluster max zoom** (where clustering can happen), only that friend glides.
    - At street zoom, the rest are ranked by screen speed (ground speed ÷ metres-per-pixel at the current zoom and latitude); the top `K` from the budget with ≥ 2 px/s also glide.
 3. **Movement segments:**
-   - When a gliding member gets a new fix: a segment from its current drawn position (interpolated at `now`) to the new fix, over the expected update interval (clamped 0.5–5 s).
-   - A snap fix gives a zero-length segment.
+   - When a gliding member gets a new fix: its target becomes the new fix, glided over the last fix interval (clamped 0.5–5 s). The renderer starts the glide from wherever it is drawing the pin at that moment, on its own clock.
+   - A snap fix gives a zero duration.
    - Segments are sent as a `MotionFrame` when fixes arrive, not every frame.
 4. **Still pins:**
    - The still frame always holds **every** on-screen still pin, because sources are replace-all.
