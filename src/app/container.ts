@@ -4,12 +4,13 @@ import { LiveSession } from '@core/engine';
 import { noopPerf, type Stop } from '@core/protocols';
 import { PerfRecorder } from '@lab/perf';
 import { ExpoDeviceManager } from '@managers/device';
-import { SyntheticFeedManager } from '@managers/feed';
+import { PROFILES } from '@core/models';
+import { SCENARIOS, SyntheticFeedManager, withFaults } from '@managers/feed';
 import { MapLibreManager } from '@managers/map';
 
 import type { LaunchParams } from './launch-params';
 
-/** Concert venue centre (BKC grounds, Mumbai), [lng, lat]. */
+/** Scene centre for every scenario (BKC grounds, Mumbai), [lng, lat]. */
 export const VENUE: [number, number] = [72.8656, 19.0657];
 
 export type Container = {
@@ -20,8 +21,9 @@ export type Container = {
 };
 
 export function createContainer(params: LaunchParams): Container {
+  const scenario = SCENARIOS[params.scenario];
   const device = new ExpoDeviceManager();
-  const feed = new SyntheticFeedManager(
+  const synthetic = new SyntheticFeedManager(
     {
       scenario: params.scenario,
       friends: params.friends,
@@ -31,9 +33,16 @@ export function createContainer(params: LaunchParams): Container {
     },
     device.clock,
   );
-  const map = new MapLibreManager({ center: VENUE, zoom: 14.5 });
-  const recorder = params.perf ? new PerfRecorder(`rung ${params.rung}`) : null;
-  const session = new LiveSession({ feed, map, device, perf: recorder ?? noopPerf });
+  const feed = withFaults(synthetic, params.faults, params.seed);
+  const map = new MapLibreManager({ center: VENUE, zoom: scenario.zoom });
+  const recorder = params.perf ? new PerfRecorder(`rung ${params.rung} ${params.scenario}`) : null;
+  const session = new LiveSession({
+    feed,
+    map,
+    device,
+    perf: recorder ?? noopPerf,
+    profile: PROFILES[scenario.profile],
+  });
 
   return {
     screens: { session, MapView: map.MapView },

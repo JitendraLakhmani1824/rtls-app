@@ -7,6 +7,8 @@ import type {
   Member,
   MotionFrame,
   PinFrame,
+  PresenceBatch,
+  TrailFrame,
   Viewport,
 } from '../models';
 
@@ -52,7 +54,10 @@ export interface DeviceManager {
 
 export interface FeedSink {
   onMembers(members: Member[]): void;
+  /** Per member, `seq` only ever increases; anything older or equal is a duplicate. */
   onFixes(batch: FixBatch): void;
+  /** Heartbeats from members who are still connected but not moving, and pause flags. */
+  onPresence(batch: PresenceBatch): void;
   onState(state: ConnState): void;
   onSessionEnded(): void;
 }
@@ -81,7 +86,11 @@ export interface MapManager {
   setStill(frame: PinFrame): void;
   /** The whole gliding set and each member's target; the map glides them itself. */
   setMoving(frame: MotionFrame): void;
+  /** Every trail to draw (replaces the previous frame). */
+  setTrails(frame: TrailFrame): void;
   setSelected(member: number | null): void;
+  /** Most gliding updates per second the map should draw; 0 = no gliding. */
+  setFrameRateCap(fps: number): void;
   onPinPress(listener: (member: number) => void): Stop;
 }
 

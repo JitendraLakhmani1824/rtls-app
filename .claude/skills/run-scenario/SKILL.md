@@ -7,13 +7,15 @@ description: Build and run the RTLS app on the iOS simulator or the USB-connecte
 
 ## Scenario deep links
 
-`rtls://scenario?friends=500&interval=1000&seed=42&rung=D&perf=1`
+`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&faults=drops,jumps&rung=D&perf=1`
 
 | Param | Meaning | Default |
 | --- | --- | --- |
+| `name` | `concert` (event: most people standing), `marathon` (race: runners on a 5 km loop), `trip` (convoy of cars on a 24 km road) | concert |
 | `friends` | People in the session (1–5000) | 200 |
 | `interval` | Ms between fixes for a moving friend | 1000 |
 | `seed` | Same seed → same crowd | 42 |
+| `faults` | Comma list of `drops` (10% lost), `dups` (5% twice), `reorder` (5% late), `jumps` (2% thrown 300 m) | none |
 | `rung` | `A` = one Marker per friend (comparison only), `D` = real engine | D |
 | `perf` | `1` prints a `PERF {json}` line every second | 1 in dev builds, 0 in release |
 

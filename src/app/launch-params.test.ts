@@ -8,21 +8,28 @@ describe('parseLaunchUrl', () => {
 
   it('reads every parameter from a scenario link', () => {
     expect(
-      parseLaunchUrl('rtls://scenario?name=concert&friends=500&interval=2000&seed=9&rung=A&perf=1'),
+      parseLaunchUrl(
+        'rtls://scenario?name=trip&friends=500&interval=2000&seed=9&faults=jumps,drops&rung=A&perf=1',
+      ),
     ).toEqual({
-      scenario: 'concert',
+      scenario: 'trip',
       friends: 500,
       intervalMs: 2000,
       seed: 9,
+      faults: ['drops', 'jumps'],
       rung: 'A',
       perf: true,
     });
   });
 
-  it('clamps out-of-range numbers and ignores unknown rungs', () => {
-    const p = parseLaunchUrl('rtls://scenario?friends=999999&interval=1&rung=Z');
+  it('clamps out-of-range numbers and ignores unknown names, rungs and faults', () => {
+    const p = parseLaunchUrl(
+      'rtls://scenario?name=rave&friends=999999&interval=1&rung=Z&faults=fire',
+    );
+    expect(p.scenario).toBe(DEFAULT_PARAMS.scenario);
     expect(p.friends).toBe(5000);
     expect(p.intervalMs).toBe(100);
     expect(p.rung).toBe(DEFAULT_PARAMS.rung);
+    expect(p.faults).toEqual([]);
   });
 });

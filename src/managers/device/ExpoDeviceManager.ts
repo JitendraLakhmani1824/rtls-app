@@ -1,18 +1,8 @@
 import { createStore } from '@core/utils';
-import type { Clock, DeviceManager, FrameScheduler, Power, Readable, Stop } from '@core/protocols';
+import type { DeviceManager, FrameScheduler, Power, Readable, Stop } from '@core/protocols';
 import { AppState, type AppStateStatus } from 'react-native';
 
-const systemClock: Clock = {
-  now: () => Date.now(),
-  every(ms, cb) {
-    const id = setInterval(cb, ms);
-    return () => clearInterval(id);
-  },
-  after(ms, cb) {
-    const id = setTimeout(cb, ms);
-    return () => clearTimeout(id);
-  },
-};
+import { systemClock } from './systemClock';
 
 const animationFrames: FrameScheduler = {
   start(cb) {

@@ -387,7 +387,7 @@ type ServerHint = { watchers: number; nextIntervalMs: number; sessionEndsAt: num
 - Per member, preallocated: latest fix (`lng, lat, tMs, accuracy, seq`), previous accepted fix, a pending-jump slot, a `TrailBuffer`.
 - **`ingest(batch)`**, O(k) for k fixes, no allocation per fix:
   1. `seq ≤ lastSeq` → drop (duplicate or out of order).
-  2. Implied speed from the previous accepted fix above the profile maximum (walk 4 m/s, run 8 m/s, drive 60 m/s) → park as a pending jump. If the next fix lands within 50 m of it, accept the jump and mark it **snap**; otherwise discard it. **Every accepted over-speed fix snaps**, whatever its reported accuracy.
+  2. Implied speed from the previous accepted fix above the profile maximum (walk 4 m/s, run 8 m/s, drive 60 m/s), counting only distance beyond both fixes' accuracy radii (GPS noise is not movement) → park as a pending jump. If the next fix lands within 50 m of it, accept the jump and mark it **snap**; otherwise discard it. **Every accepted over-speed fix snaps**, whatever its reported accuracy.
   3. Accuracy > 50 m → update latest (the map shows a halo) but don't extend the trail.
   4. Moved ≥ 5 m since the last trail point → append to the trail.
   5. Mark the member dirty.
@@ -405,7 +405,7 @@ Computed on the 1 Hz tick from when a member was last heard from (fix or heartbe
 
 | State | Rule |
 | --- | --- |
-| `Live` | Heard within 2.5× its expected interval (moving: the fix interval; still: the 60 s heartbeat → 150 s) |
+| `Live` | Heard within 2.5× its expected interval, and never less than 10 s (moving: the fix interval; still: the 60 s heartbeat → 150 s) |
 | `Recent` | Up to 5 min |
 | `Stale` | Over 5 min ("last seen") |
 | `Paused` | Flagged by the sharer |
@@ -418,7 +418,8 @@ Inputs: store, viewport, selection, budget, `now`. Outputs: what to send to the 
 2. **Who glides:**
    - The selected or followed friend always glides.
    - **Below the cluster max zoom** (where clustering can happen), only that friend glides.
-   - At street zoom, the rest are ranked by screen speed (ground speed ÷ metres-per-pixel at the current zoom and latitude); the top `K` from the budget with ≥ 2 px/s also glide.
+   - At street zoom, the rest are ranked by screen speed (ground speed ÷ metres-per-pixel at the current zoom and latitude); the top `K` from the budget with ≥ 2 px/s also glide. A pin already gliding keeps gliding down to 1 px/s, so GPS noise doesn't flip it.
+   - Decided on the 1 Hz tick, together with the still frame, so a pin moves between sources in one step (never drawn twice) and the still source stays ≤ 1×/s. Selection, zoom and budget changes apply at once.
 3. **Movement segments:**
    - When a gliding member gets a new fix: its target becomes the new fix, glided over the last fix interval (clamped 0.5–5 s). The renderer starts the glide from wherever it is drawing the pin at that moment, on its own clock.
    - A snap fix gives a zero duration.
@@ -458,7 +459,7 @@ stateDiagram-v2
   1. `feed.start(sink, cursor)`.
   2. Subscribe to viewport (**throttled**: first and last event in every 150 ms window) and power.
   3. Re-send everything to the map; it may have been recreated.
-  4. Start the 1 Hz tick: presence, still pins, session snapshot.
+  4. Start the 1 Hz tick: presence, who glides, trails, still pins, session snapshot.
 - **Frame loop.** Runs only while Running, the map has `frame()`, and a glide is unfinished. New fixes, viewport changes and selection wake it; it stops itself when `frame()` reports no glide left.
 - **Leaving Running.** Stop the feed (keep its cursor) and the ticks. The store keeps last-known positions.
 - **Feed events:**
@@ -504,7 +505,7 @@ stateDiagram-v2
   - **Once-a-second sources** (`pins-still`, `trails`): a prop on a small leaf component.
   - **Fallback:** `getAnimatableRef().setNativeProps({ data })`, about 4 ms of JS per update.
   - **Still to check:** a real iPhone, where source parsing and the worklet share the main thread.
-- **Frame cap:** `preferredFramesPerSecond` from the budget.
+- **Frame cap:** gliding updates at most the budget's fps (and never more than ~33/s, each is a source re-parse); `preferredFramesPerSecond` = the budget's fps, at least 30 so pans stay smooth.
 - **Viewport:** `onRegionIsChanging` / `onRegionDidChange` feed a plain emitter, never React state.
 - **Platform difference:** Android parses source data off the main thread and keeps only the latest; iOS parses on the main thread. Per-frame payloads stay small (≤ ~30 features, a few KB).
 
@@ -522,7 +523,7 @@ stateDiagram-v2
 
   It shows status, last seen, distance + direction, and a Follow button. `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
 - **Fallback:** if the M0 sheet check fails on Android, the detail card renders inside Home's panel.
-- **Launch parameters:** `app/launch-params.ts` reads a deep link (`rtls://scenario?name=marathon&friends=500&hz=1&seed=42&rung=D&faults=drops,jumps`) or the dev scenario picker and builds the container from it. The ladder rung is fixed at launch, so production code never checks it.
+- **Launch parameters:** `app/launch-params.ts` reads a deep link (`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&rung=D&faults=drops,jumps`) or the dev scenario picker and builds the container from it. The ladder rung is fixed at launch, so production code never checks it.
 - **Layout:** portrait only. Layout reads window size, never screen size.
 
 ## 2.7 Battery on the phone

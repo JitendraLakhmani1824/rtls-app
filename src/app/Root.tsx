@@ -16,6 +16,7 @@ export function Root() {
     return (
       <RungAScreen
         key={paramsKey(params)}
+        scenario={params.scenario}
         friends={params.friends}
         seed={params.seed}
         intervalMs={params.intervalMs}

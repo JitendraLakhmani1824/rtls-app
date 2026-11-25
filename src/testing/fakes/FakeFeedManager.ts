@@ -1,4 +1,10 @@
-import { FIX_STRIDE, type ConnState, type Cursor, type Member } from '@core/models';
+import {
+  FIX_STRIDE,
+  PRESENCE_STRIDE,
+  type ConnState,
+  type Cursor,
+  type Member,
+} from '@core/models';
 import type { FeedHandle, FeedManager, FeedSink } from '@core/protocols';
 
 /** A feed you drive by hand. Records every start (with its resume cursor) and stop. */
@@ -30,13 +36,23 @@ export class FakeFeedManager implements FeedManager {
     this.sink?.onMembers(members);
   }
 
-  /** Sends one batch. Each fix: [member, seq, lng, lat, tMs]. */
-  fixes(...fixes: [number, number, number, number, number][]) {
+  /** Sends one batch. Each fix: [member, seq, lng, lat, tMs, accuracyM = 10]. */
+  fixes(...fixes: [number, number, number, number, number, number?][]) {
     if (!this.sink) return;
     const buf = new Float64Array(fixes.length * FIX_STRIDE);
-    fixes.forEach(([m, seq, lng, lat, t], i) => buf.set([m, seq, lng, lat, t, 10], i * FIX_STRIDE));
+    fixes.forEach(([m, seq, lng, lat, t, acc = 10], i) =>
+      buf.set([m, seq, lng, lat, t, acc], i * FIX_STRIDE),
+    );
     this.position += 1;
     this.sink.onFixes({ n: fixes.length, buf });
+  }
+
+  /** Sends heartbeats. Each: [member, heardAtMs, paused (0 | 1)]. */
+  presence(...beats: [number, number, number][]) {
+    if (!this.sink) return;
+    const buf = new Float64Array(beats.length * PRESENCE_STRIDE);
+    beats.forEach((beat, i) => buf.set(beat, i * PRESENCE_STRIDE));
+    this.sink.onPresence({ n: beats.length, buf });
   }
 
   state(state: ConnState) {

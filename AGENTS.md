@@ -2,7 +2,7 @@
 
 Live location sharing for events: friends' pins and short trails on one map — smooth with hundreds of people on screen, cheap on battery. A case study (Principal Engineer, Mobile). Expo SDK 58 · React Native 0.88 (New Architecture) · TypeScript · MapLibre.
 
-**Status:** M1 — the app opens the live map: synthetic feed → `LiveSession` → MapLibre (still pins ≤ 1×/s, gliding pins on the UI thread). Friend list, Detail sheet, trails and battery work arrive in M2–M5 (`docs/plan.md` §7).
+**Status:** M2 — the engine is complete and tested: presence (heartbeats), trails with age fading, GPS-jump handling, power budget, three seeded scenarios (concert, marathon, trip) and feed faults, with a replay fingerprint. Friend list, Detail sheet and battery work arrive in M3–M5 (`docs/plan.md` §7).
 
 | Read                   | For                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------ |

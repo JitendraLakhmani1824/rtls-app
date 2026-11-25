@@ -1,10 +1,15 @@
-import { FIX_STRIDE, type Cursor, type FixBatch, type Member } from '@core/models';
+import {
+  FIX_STRIDE,
+  PRESENCE_STRIDE,
+  type Cursor,
+  type FixBatch,
+  type Member,
+  type PresenceBatch,
+} from '@core/models';
 import type { Clock, FeedHandle, FeedManager, FeedSink, Stop } from '@core/protocols';
 import { createRng, offsetMeters, type Rng } from '@core/utils';
 
-import { createConcert, stepConcert, type Crowd } from './scenarios/concert';
-
-export type ScenarioName = 'concert';
+import { SCENARIOS, type ScenarioName, type World } from './scenarios';
 
 export type SyntheticFeedOptions = {
   scenario: ScenarioName;
@@ -12,13 +17,21 @@ export type SyntheticFeedOptions = {
   seed: number;
   /** How often a moving friend sends a fix. */
   movingIntervalMs: number;
-  /** Venue centre, [lng, lat]. */
+  /** Scene centre, [lng, lat]. */
   center: [number, number];
 };
 
 const BATCH_MS = 250;
-const STILL_INTERVAL_MS = 30_000;
-const GPS_NOISE_M = 3;
+/** A still friend's heartbeat, and an occasional fix so small drifts show up. */
+const HEARTBEAT_MS = 60_000;
+const STILL_FIX_MS = 5 * 60_000;
+/** GPS error drifts slowly rather than jumping each fix: a random walk pulled back to zero (≈ 1.5 m typical). */
+const GPS_NOISE_STEP_M = 1;
+const GPS_NOISE_PULL = 0.85;
+/** Some friends' phones go silent (battery, tunnel) between 30 s and 2 min in → Recent, then Stale. */
+const OFFLINE_SHARE = 0.04;
+/** Some friends have paused sharing → hidden. */
+const PAUSED_SHARE = 0.02;
 const PALETTE = [
   '#E4572E',
   '#17BEBB',
@@ -31,16 +44,23 @@ const PALETTE = [
 ];
 
 /**
- * Stands in for the server feed. Seeded, so the same options give the same crowd.
- * The crowd keeps living while stopped: on resume, people have moved on.
+ * Stands in for the server feed, behind the same FeedManager protocol. Seeded: the same options
+ * give the same crowd. Sends a snapshot first (everyone's position), then fixes for moving friends
+ * and heartbeats for still ones. The world keeps living while stopped: on resume, people have moved on.
  */
 export class SyntheticFeedManager implements FeedManager {
   private readonly rng: Rng;
-  private readonly crowd: Crowd;
+  private readonly world: World;
   private readonly members: Member[];
   private readonly nextFixAt: Float64Array;
+  private readonly nextBeatAt: Float64Array;
   private readonly seq: Float64Array;
-  private readonly batch: FixBatch;
+  private readonly silentFrom: Float64Array; // Infinity = never goes offline
+  private readonly paused: Uint8Array;
+  private readonly noiseX: Float64Array;
+  private readonly noiseY: Float64Array;
+  private readonly fixes: FixBatch;
+  private readonly beats: PresenceBatch;
   private lastStepAt = NaN;
   private position = 0;
 
@@ -50,32 +70,50 @@ export class SyntheticFeedManager implements FeedManager {
   ) {
     const n = options.friends;
     this.rng = createRng(options.seed);
-    this.crowd = createConcert(this.rng, n);
+    this.world = SCENARIOS[options.scenario].create(this.rng, n);
     this.members = Array.from({ length: n }, (_, i) => memberAt(i));
     this.nextFixAt = new Float64Array(n);
+    this.nextBeatAt = new Float64Array(n);
     this.seq = new Float64Array(n);
-    this.batch = { n: 0, buf: new Float64Array(n * FIX_STRIDE) };
+    this.silentFrom = new Float64Array(n).fill(Infinity);
+    this.paused = new Uint8Array(n);
+    this.noiseX = new Float64Array(n);
+    this.noiseY = new Float64Array(n);
+    for (let i = 1; i < n; i++) {
+      const r = this.rng.next();
+      if (r < OFFLINE_SHARE) this.silentFrom[i] = this.rng.range(30_000, 120_000);
+      else if (r < OFFLINE_SHARE + PAUSED_SHARE) this.paused[i] = 1;
+    }
+    this.fixes = { n: 0, buf: new Float64Array(n * FIX_STRIDE) };
+    this.beats = { n: 0, buf: new Float64Array(n * PRESENCE_STRIDE) };
   }
 
   start(sink: FeedSink, resume?: Cursor): FeedHandle {
     let stopped = false;
     if (resume) this.position = resume.feedPosition;
     const now = this.clock.now();
-    if (Number.isNaN(this.lastStepAt)) {
-      // First start: spread first fixes over one interval so batches stay even.
-      for (let i = 0; i < this.members.length; i++)
+    const firstStart = Number.isNaN(this.lastStepAt);
+    if (firstStart) {
+      for (let i = 0; i < this.members.length; i++) {
+        this.silentFrom[i] = now + (this.silentFrom[i] ?? Infinity);
+        // Spread regular traffic over one interval so batches stay even.
         this.nextFixAt[i] = now + this.rng.range(0, this.intervalOf(i));
+        this.nextBeatAt[i] = now + this.rng.range(0, HEARTBEAT_MS);
+      }
     }
     this.lastStepAt = now;
 
     sink.onMembers(this.members);
     sink.onState({ kind: 'live', sinceMs: now });
+    sink.onFixes(this.snapshot(now)); // like the server's snapshot: everyone's latest position
+    sink.onPresence(this.pauseFlags(now));
 
     const stopTimer: Stop = this.clock.every(BATCH_MS, () => {
       if (stopped) return;
       this.position++;
-      const batch = this.step();
-      if (batch.n > 0) sink.onFixes(batch);
+      this.step();
+      if (this.fixes.n > 0) sink.onFixes(this.fixes);
+      if (this.beats.n > 0) sink.onPresence(this.beats);
     });
 
     return {
@@ -89,37 +127,77 @@ export class SyntheticFeedManager implements FeedManager {
   }
 
   private intervalOf(i: number) {
-    return (this.crowd.speed[i] ?? 0) > 0 ? this.options.movingIntervalMs : STILL_INTERVAL_MS;
+    return this.world.moving(i) ? this.options.movingIntervalMs : STILL_FIX_MS;
   }
 
-  /** Advances the crowd to now and emits a fix for everyone whose next fix is due. */
-  private step(): FixBatch {
-    const now = this.clock.now();
-    stepConcert(this.crowd, this.rng, (now - this.lastStepAt) / 1000);
-    this.lastStepAt = now;
+  private snapshot(now: number): FixBatch {
+    this.fixes.n = 0;
+    for (let i = 0; i < this.members.length; i++) this.addFix(i, now);
+    return this.fixes;
+  }
 
-    const b = this.batch;
-    b.n = 0;
+  private pauseFlags(now: number): PresenceBatch {
+    this.beats.n = 0;
+    for (let i = 0; i < this.members.length; i++) if (this.paused[i]) this.addBeat(i, now);
+    return this.beats;
+  }
+
+  /** Advances the world to now; collects due fixes (moving friends) and heartbeats (still friends). */
+  private step() {
+    const now = this.clock.now();
+    this.world.step(this.rng, (now - this.lastStepAt) / 1000);
+    this.lastStepAt = now;
+    this.fixes.n = 0;
+    this.beats.n = 0;
     for (let i = 0; i < this.members.length; i++) {
-      if (now < (this.nextFixAt[i] ?? 0)) continue;
-      this.nextFixAt[i] = now + this.intervalOf(i);
-      this.seq[i] = (this.seq[i] ?? 0) + 1;
-      const [lng, lat] = offsetMeters(
-        this.options.center[0],
-        this.options.center[1],
-        (this.crowd.x[i] ?? 0) + this.rng.range(-GPS_NOISE_M, GPS_NOISE_M),
-        (this.crowd.y[i] ?? 0) + this.rng.range(-GPS_NOISE_M, GPS_NOISE_M),
-      );
-      const o = b.n * FIX_STRIDE;
-      b.buf[o] = i;
-      b.buf[o + 1] = this.seq[i] ?? 0;
-      b.buf[o + 2] = lng;
-      b.buf[o + 3] = lat;
-      b.buf[o + 4] = now;
-      b.buf[o + 5] = this.rng.range(5, 15);
-      b.n++;
+      if (now >= (this.silentFrom[i] ?? Infinity)) continue;
+      if (now >= (this.nextBeatAt[i] ?? 0)) {
+        this.nextBeatAt[i] = now + HEARTBEAT_MS;
+        if (!this.world.moving(i) || this.paused[i]) this.addBeat(i, now);
+      }
+      if (this.paused[i]) continue;
+      if (now >= (this.nextFixAt[i] ?? 0)) {
+        this.nextFixAt[i] = now + this.intervalOf(i);
+        this.addFix(i, now);
+      } else if (
+        this.world.moving(i) &&
+        (this.nextFixAt[i] ?? 0) - now > this.options.movingIntervalMs
+      ) {
+        this.nextFixAt[i] = now; // started moving after a still spell: report right away
+      }
     }
-    return b;
+  }
+
+  private addFix(i: number, now: number) {
+    this.seq[i] = (this.seq[i] ?? 0) + 1;
+    const nx = (this.noiseX[i] ?? 0) * GPS_NOISE_PULL + this.rng.range(-1, 1) * GPS_NOISE_STEP_M;
+    const ny = (this.noiseY[i] ?? 0) * GPS_NOISE_PULL + this.rng.range(-1, 1) * GPS_NOISE_STEP_M;
+    this.noiseX[i] = nx;
+    this.noiseY[i] = ny;
+    const [lng, lat] = offsetMeters(
+      this.options.center[0],
+      this.options.center[1],
+      (this.world.x[i] ?? 0) + nx,
+      (this.world.y[i] ?? 0) + ny,
+    );
+    const f = this.fixes;
+    const o = f.n * FIX_STRIDE;
+    f.buf[o] = i;
+    f.buf[o + 1] = this.seq[i] ?? 0;
+    f.buf[o + 2] = lng;
+    f.buf[o + 3] = lat;
+    f.buf[o + 4] = now;
+    f.buf[o + 5] = this.rng.range(5, 15);
+    f.n++;
+  }
+
+  private addBeat(i: number, now: number) {
+    const b = this.beats;
+    const o = b.n * PRESENCE_STRIDE;
+    b.buf[o] = i;
+    b.buf[o + 1] = now;
+    b.buf[o + 2] = this.paused[i] ?? 0;
+    b.n++;
   }
 }
 

@@ -28,11 +28,10 @@ import Animated, {
 
 import positron from '../../../assets/map-style/positron.json';
 import { EMPTY_FC } from './encode';
-import type { MapViewModel, MemberTable } from './viewModel';
+import type { MapViewModel, MemberTable, TrailTip } from './viewModel';
 
 const MAP_STYLE = positron as unknown as StyleSpecification;
 const FONT = ['Noto Sans Bold']; // the only glyphs OpenFreeMap serves
-const GLIDE_FRAME_MS = 30; // gliding pins update at most ~33×/s
 const CLUSTER_MAX_ZOOM = 15;
 
 type PressEvent = Parameters<NonNullable<GeoJSONSourceProps['onPress']>>[0];
@@ -47,6 +46,7 @@ export function createMapView(model: MapViewModel): ComponentType {
 
 function MapLibreView({ model }: { model: MapViewModel }) {
   const cameraRef = useRef<CameraRef>(null);
+  const fps = useSyncExternalStore(model.mapFps.subscribe, model.mapFps.get);
   useEffect(() => () => model.handleReady(false), [model]);
 
   const onRegion = (gesturing: boolean) => (e: { nativeEvent: ViewStateChangeEvent }) => {
@@ -66,15 +66,37 @@ function MapLibreView({ model }: { model: MapViewModel }) {
       style={StyleSheet.absoluteFill}
       mapStyle={MAP_STYLE}
       logo={false}
-      preferredFramesPerSecond={60}
+      preferredFramesPerSecond={fps}
       onDidFinishLoadingStyle={() => model.handleReady(true)}
       onRegionIsChanging={onRegion(true)}
       onRegionDidChange={onRegion(false)}
     >
       <Camera ref={cameraRef} initialViewState={model.initialView} />
+      <Trails model={model} />
       <StillPins model={model} cameraRef={cameraRef} />
       <GlidingPins model={model} />
     </MapLibreMap>
+  );
+}
+
+// ── Trails: a leaf component, re-rendered when trails change (≤ 1×/s); drawn under the pins ──
+
+function Trails({ model }: { model: MapViewModel }) {
+  const data = useSyncExternalStore(model.trailData.subscribe, model.trailData.get);
+  return (
+    <GeoJSONSource id="trails" data={data} tolerance={0.5}>
+      <Layer
+        id="trail-lines"
+        type="line"
+        layout={{ 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['get', 's'] }}
+        paint={{
+          'line-color': ['get', 'c'],
+          'line-width': ['case', ['==', ['get', 's'], 1], 5, 3],
+          // Fades by age bucket (0 newest … 3 oldest): one source, opacity per feature.
+          'line-opacity': ['match', ['get', 'a'], 0, 0.9, 1, 0.65, 2, 0.4, 0.2],
+        }}
+      />
+    </GeoJSONSource>
   );
 }
 
@@ -185,11 +207,13 @@ const AnimatedSource = Animated.createAnimatedComponent(ForwardedSource);
 type Glides = Record<string, number[]>;
 
 function GlidingPins({ model }: { model: MapViewModel }) {
-  const { motion, table, selectedMember } = model;
+  const { motion, table, selectedMember, glideFrameMs, trailTip } = model;
   const glides = useSharedValue<Glides>({});
   const applied = useSharedValue(-1);
   const drawnSelected = useSharedValue(-1);
+  const drawnTip = useSharedValue(-1);
   const data = useSharedValue(EMPTY_FC);
+  const tipData = useSharedValue(EMPTY_FC);
   const lastFrame = useSharedValue(0);
   const settled = useSharedValue(true);
 
@@ -207,15 +231,22 @@ function GlidingPins({ model }: { model: MapViewModel }) {
       drawnSelected.value = selectedMember.value;
       changed = true;
     }
+    if (trailTip.value.version !== drawnTip.value) {
+      drawnTip.value = trailTip.value.version;
+      changed = true;
+    }
     if (!changed && settled.value) return; // nothing gliding: no work at all
-    if (!changed && now - lastFrame.value < GLIDE_FRAME_MS) return;
+    if (!changed && now - lastFrame.value < glideFrameMs.value) return;
     lastFrame.value = now;
     const out = encodeGliding(glides.value, now, table.value, selectedMember.value);
     data.value = out.json;
     settled.value = out.settled;
+    const tip = encodeTip(glides.value, now, table.value, selectedMember.value, trailTip.value);
+    if (tip !== tipData.value) tipData.value = tip;
   });
 
   const animatedProps = useAnimatedProps(() => ({ data: data.value }));
+  const tipProps = useAnimatedProps(() => ({ data: tipData.value }));
   const onPress = useCallback(
     (e: PressEvent) => {
       const m = e.nativeEvent.features[0]?.properties?.m;
@@ -225,35 +256,46 @@ function GlidingPins({ model }: { model: MapViewModel }) {
   );
 
   return (
-    <AnimatedSource
-      id="pins-moving"
-      data={EMPTY_FC}
-      onPress={onPress}
-      animatedProps={animatedProps}
-    >
-      <Layer
-        id="moving-pins"
-        type="circle"
-        paint={{
-          'circle-color': ['get', 'c'],
-          'circle-radius': 10,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': ['case', ['==', ['get', 's'], 1], 4, 2],
-        }}
-      />
-      <Layer
-        id="moving-initials"
-        type="symbol"
-        layout={{
-          'text-field': ['get', 't'],
-          'text-font': FONT,
-          'text-size': 9,
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        }}
-        paint={{ 'text-color': '#ffffff' }}
-      />
-    </AnimatedSource>
+    <>
+      <AnimatedSource id="trail-tip" data={EMPTY_FC} animatedProps={tipProps}>
+        <Layer
+          id="trail-tip-line"
+          type="line"
+          beforeId="still-clusters"
+          layout={{ 'line-cap': 'round' }}
+          paint={{ 'line-color': ['get', 'c'], 'line-width': 5, 'line-opacity': 0.9 }}
+        />
+      </AnimatedSource>
+      <AnimatedSource
+        id="pins-moving"
+        data={EMPTY_FC}
+        onPress={onPress}
+        animatedProps={animatedProps}
+      >
+        <Layer
+          id="moving-pins"
+          type="circle"
+          paint={{
+            'circle-color': ['get', 'c'],
+            'circle-radius': 10,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': ['case', ['==', ['get', 's'], 1], 4, 2],
+          }}
+        />
+        <Layer
+          id="moving-initials"
+          type="symbol"
+          layout={{
+            'text-field': ['get', 't'],
+            'text-font': FONT,
+            'text-size': 9,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+          }}
+          paint={{ 'text-color': '#ffffff' }}
+        />
+      </AnimatedSource>
+    </>
   );
 }
 
@@ -333,4 +375,34 @@ function encodeGliding(
       ']}}';
   }
   return { json: s + ']}', settled };
+}
+
+/** The selected friend's trail, from its newest point to where the pin is drawn now. Empty unless it glides. */
+function encodeTip(
+  glides: Glides,
+  now: number,
+  table: MemberTable,
+  selected: number,
+  tip: TrailTip,
+): string {
+  'worklet';
+  const g = glides[selected];
+  if (!g || !Number.isFinite(tip.lng) || !Number.isFinite(tip.lat)) return EMPTY_FC;
+  const k = progress(g, now);
+  const lng = (g[0] as number) + ((g[2] as number) - (g[0] as number)) * k;
+  const lat = (g[1] as number) + ((g[3] as number) - (g[1] as number)) * k;
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return EMPTY_FC;
+  return (
+    '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"c":"' +
+    (table.colours[selected] ?? '#334155') +
+    '"},"geometry":{"type":"LineString","coordinates":[[' +
+    tip.lng.toFixed(6) +
+    ',' +
+    tip.lat.toFixed(6) +
+    '],[' +
+    lng.toFixed(6) +
+    ',' +
+    lat.toFixed(6) +
+    ']]}}]}'
+  );
 }

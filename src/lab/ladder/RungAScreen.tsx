@@ -2,7 +2,7 @@
 // friends live in React state and each one is a MapLibre <Marker> (a native view), re-rendered per batch.
 import { FIX_STRIDE, type Member } from '@core/models';
 import { ExpoDeviceManager } from '@managers/device';
-import { SyntheticFeedManager } from '@managers/feed';
+import { SCENARIOS, SyntheticFeedManager, type ScenarioName } from '@managers/feed';
 import {
   Camera,
   Map as MapLibreMap,
@@ -15,17 +15,23 @@ import { StyleSheet, Text, View } from 'react-native';
 import positron from '../../../assets/map-style/positron.json';
 import { PerfRecorder } from '../perf';
 
-type Props = { friends: number; seed: number; intervalMs: number; center: [number, number] };
+type Props = {
+  scenario: ScenarioName;
+  friends: number;
+  seed: number;
+  intervalMs: number;
+  center: [number, number];
+};
 type Position = [lng: number, lat: number];
 
-export function RungAScreen({ friends, seed, intervalMs, center }: Props) {
+export function RungAScreen({ scenario, friends, seed, intervalMs, center }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
   const [positions, setPositions] = useState<Record<number, Position>>({});
 
   useEffect(() => {
     const device = new ExpoDeviceManager();
     const feed = new SyntheticFeedManager(
-      { scenario: 'concert', friends, seed, movingIntervalMs: intervalMs, center },
+      { scenario, friends, seed, movingIntervalMs: intervalMs, center },
       device.clock,
     );
     const perf = new PerfRecorder('rung A');
@@ -41,6 +47,7 @@ export function RungAScreen({ friends, seed, intervalMs, center }: Props) {
         }
         setPositions((prev) => ({ ...prev, ...updates }));
       },
+      onPresence: () => {},
       onState: () => {},
       onSessionEnded: () => {},
     });
@@ -48,7 +55,7 @@ export function RungAScreen({ friends, seed, intervalMs, center }: Props) {
       handle.stop();
       stopPerf();
     };
-  }, [friends, seed, intervalMs, center]);
+  }, [scenario, friends, seed, intervalMs, center]);
 
   return (
     <MapLibreMap
@@ -56,7 +63,7 @@ export function RungAScreen({ friends, seed, intervalMs, center }: Props) {
       mapStyle={positron as unknown as StyleSpecification}
       logo={false}
     >
-      <Camera initialViewState={{ center, zoom: 14.5 }} />
+      <Camera initialViewState={{ center, zoom: SCENARIOS[scenario].zoom }} />
       {members.map((m) => {
         const p = positions[m.id];
         if (!p) return null;

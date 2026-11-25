@@ -29,8 +29,77 @@ export const PIN_STRIDE = 4;
 export type MotionFrame = { n: number; buf: Float64Array };
 export const MOTION_STRIDE = 4;
 
-/** Presence codes carried in PinFrame. */
+/** Presence codes carried in PinFrame. Paused members are not drawn at all. */
 export const Presence = { Live: 0, Recent: 1, Stale: 2 } as const;
+
+/** Heartbeats ("I'm still here") and pause flags. Each entry is PRESENCE_STRIDE numbers: member, heardAtMs, paused (0/1). */
+export type PresenceBatch = { n: number; buf: Float64Array };
+export const PRESENCE_STRIDE = 3;
+
+/**
+ * Trails to draw. Part i belongs to member `members[i]`; its points are TRAIL_STRIDE numbers each
+ * (lng, lat, ageBucket 0 = newest … 3 = oldest) from coords[offsets[i] * TRAIL_STRIDE] up to offsets[i + 1].
+ * A member's trail splits into several parts at data gaps and jumps — never a straight line across them.
+ */
+export type TrailFrame = {
+  n: number;
+  members: Float64Array;
+  offsets: Uint32Array;
+  coords: Float64Array;
+};
+export const TRAIL_STRIDE = 3;
+
+/** How a session behaves, set by its type (PRD §3). */
+export type SessionProfile = {
+  name: 'event' | 'race' | 'trip';
+  /** Faster than this between two fixes is a GPS jump, not movement. */
+  maxSpeedMs: number;
+  /** Trail points older than this are not drawn. Infinity = the whole session. */
+  trailWindowMs: number;
+  /** Fixed memory per member. */
+  trailCapacity: number;
+  /** A new trail point only after moving at least this far. */
+  trailMinStepM: number;
+  /** When full: thin the oldest half (true) or overwrite the oldest point (false). */
+  keepWholeTrail: boolean;
+};
+
+export const PROFILES: Record<SessionProfile['name'], SessionProfile> = {
+  event: {
+    name: 'event',
+    maxSpeedMs: 4,
+    trailWindowMs: 15 * 60_000,
+    trailCapacity: 256,
+    trailMinStepM: 5,
+    keepWholeTrail: false,
+  },
+  race: {
+    name: 'race',
+    maxSpeedMs: 8,
+    trailWindowMs: Infinity,
+    trailCapacity: 512,
+    trailMinStepM: 10,
+    keepWholeTrail: true,
+  },
+  trip: {
+    name: 'trip',
+    maxSpeedMs: 60,
+    trailWindowMs: 60 * 60_000,
+    trailCapacity: 256,
+    trailMinStepM: 50,
+    keepWholeTrail: false,
+  },
+};
+
+/** How much animation the phone can afford right now (design §2.4). */
+export type Budget = {
+  /** Most members gliding at once. */
+  glideLimit: number;
+  /** Cap on gliding-pin updates per second; 0 = no gliding, pins step once a second. */
+  glideFps: number;
+  /** Motion updates per second while the user pans or zooms. */
+  gestureUpdatesPerSec: number;
+};
 
 export type Viewport = {
   west: number;

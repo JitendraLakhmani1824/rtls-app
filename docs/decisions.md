@@ -4,6 +4,11 @@ Short log of choices made after the plan was closed. Newest first.
 
 | Date | Decision | Why | Cost / revisit when |
 | --- | --- | --- | --- |
+| 2026-11-26 | Who glides is re-decided on the 1 s tick (with the still frame), and a gliding pin keeps gliding down to 1 point/s (starts at 2) | Deciding on every batch made walkers flap in and out of gliding with GPS noise: the still source went out ~3×/s and pins showed twice between sources. Replay: still frames 164 → 63 per minute | A pin starts gliding up to 1 s late |
+| 2026-11-26 | The GPS-jump speed check subtracts both fixes' accuracy from the distance | Normal noise at 1 Hz (a few metres) exceeded the 4 m/s event limit, so walkers' pins snapped instead of gliding | — |
+| 2026-11-26 | `Live` window has a 10 s floor (2.5× the interval, at least 10 s) | At 1 s fixes, two lost fixes flickered a walker to `Recent` | — |
+| 2026-11-26 | The synthetic feed's GPS error drifts (random walk pulled to zero, ≈ 1.5 m) instead of fresh noise per fix | Real receivers smooth their output; fresh noise each fix made gliding pins zigzag | — |
+| 2026-11-26 | `systemClock` in its own file in `managers/device` | So the clock contract test runs without React Native | — |
 | 2026-11-26 | `MotionFrame` = target + duration (4 numbers), not start/end timestamps (7) | M0 showed the UI thread and JS run on different clocks; with durations the renderer starts each glide from where it draws the pin, on its own clock — no clock mapping, works for a future native renderer too | — |
 | 2026-11-26 | Reference phone: OnePlus 10T (Snapdragon 8+ Gen 1, Android 15); Android builds use Android Studio's bundled JDK 17 (`JAVA_HOME`) | The phone available for measurement; React Native's Android build needs JDK 17 and the system Java is 22 | Upper-end chip flatters the numbers, so the README says so. A mid-range run would strengthen the results |
 | 2026-11-26 | Expo project `@harrylakhmani/rtls` (ID `eb8cce8b-…`), owner set in `app.config.ts`; `eas.json` profiles `development` and `preview` | Builds and share links come from EAS | — |

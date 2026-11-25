@@ -1,3 +1,4 @@
+import { FAULTS, SCENARIOS, type Fault, type ScenarioName } from '@managers/feed';
 import { useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 
@@ -5,12 +6,14 @@ import { Linking } from 'react-native';
 export type Rung = 'A' | 'D';
 
 export type LaunchParams = {
-  scenario: 'concert';
+  scenario: ScenarioName;
   friends: number;
   seed: number;
   /** How often a moving friend sends a fix, ms. */
   intervalMs: number;
   rung: Rung;
+  /** Feed faults to switch on: drops, dups, reorder, jumps. */
+  faults: Fault[];
   /** Print a PERF line per second. */
   perf: boolean;
 };
@@ -21,6 +24,7 @@ export const DEFAULT_PARAMS: LaunchParams = {
   seed: 42,
   intervalMs: 1000,
   rung: 'D',
+  faults: [],
   perf: __DEV__,
 };
 
@@ -31,7 +35,7 @@ const clampInt = (value: string | undefined, min: number, max: number, fallback:
 
 /**
  * Reads a scenario deep link, e.g.
- * `rtls://scenario?name=concert&friends=500&interval=1000&seed=7&rung=A&perf=1`.
+ * `rtls://scenario?name=marathon&friends=500&interval=1000&seed=7&faults=drops,jumps&rung=D&perf=1`.
  * Unknown or missing values fall back to the defaults; anything that isn't a scenario link gives the defaults.
  */
 export function parseLaunchUrl(
@@ -45,12 +49,17 @@ export function parseLaunchUrl(
     const [key, value] = pair.split('=');
     if (key) query[decodeURIComponent(key)] = decodeURIComponent(value ?? '');
   }
+  const name = query.name ?? '';
   return {
-    scenario: 'concert',
+    scenario: name in SCENARIOS ? (name as ScenarioName) : defaults.scenario,
     friends: clampInt(query.friends, 1, 5000, defaults.friends),
     seed: clampInt(query.seed, 0, 2 ** 31 - 1, defaults.seed),
     intervalMs: clampInt(query.interval, 100, 60_000, defaults.intervalMs),
     rung: query.rung === 'A' ? 'A' : query.rung === 'D' ? 'D' : defaults.rung,
+    faults:
+      query.faults === undefined
+        ? defaults.faults
+        : FAULTS.filter((f) => query.faults?.split(',').includes(f)),
     perf: query.perf === undefined ? defaults.perf : query.perf === '1',
   };
 }
