@@ -7,6 +7,7 @@ const WALKER_SHARE = 0.15;
 
 /** A festival crowd: most people stay near a stage or stall; ~15% walk between spots at 0.8–1.6 m/s. */
 export const concert: Scenario = {
+  title: 'Concert at BKC',
   profile: 'event',
   zoom: 14.5,
   create(rng, people) {

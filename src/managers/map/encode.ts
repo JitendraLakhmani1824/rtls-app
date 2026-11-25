@@ -18,8 +18,24 @@ export function haloPoints(haloM: number, lat: number): number {
   return h > 0 && Number.isFinite(h) ? h : 0;
 }
 
+/** My own position: one point, with the accuracy halo (h, points at zoom 0) when the fix is poor. */
+export function encodeMe(lng: number, lat: number, haloM: number): string {
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return EMPTY_FC;
+  const h = haloPoints(haloM, lat);
+  return (
+    '{"type":"FeatureCollection","features":[{"type":"Feature","properties":{' +
+    (h > 0 ? '"h":' + h.toFixed(9) : '') +
+    '},"geometry":{"type":"Point","coordinates":[' +
+    fixed(lng) +
+    ',' +
+    fixed(lat) +
+    ']}}]}'
+  );
+}
+
 /**
- * Still pins. Properties: m (member), c (colour), t (initials), p (presence), and h — the accuracy
+ * Still pins (everyone but me). Properties: m (member), c (colour), t (initials), n (name),
+ * p (presence), and h — the accuracy
  * halo's radius in points at zoom 0 (the layer doubles it per zoom level), only for poor fixes.
  * Selection is not encoded: it is feature state, so tapping a pin re-sends no data.
  */
@@ -57,7 +73,8 @@ export class StillEncoder {
       const halo = frame.buf[o + 4] ?? 0;
       const member = this.members[m];
       // One NaN would make the whole string invalid JSON and blank the layer: skip the pin instead.
-      if (!member || !Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+      // Me is drawn by its own layer (encodeMe), never grouped with friends.
+      if (!member || member.isMe || !Number.isFinite(lng) || !Number.isFinite(lat)) continue;
       const k = m * 4;
       const keys = this.keys;
       if (
@@ -93,9 +110,11 @@ function stillFeature(
     m +
     ',"c":"' +
     member.colour +
-    '","t":"' +
-    member.initials +
-    '","p":' +
+    '","t":' +
+    JSON.stringify(member.initials) +
+    ',"n":' +
+    JSON.stringify(member.name) +
+    ',"p":' +
     presence +
     (halo > 0 ? ',"h":' + halo.toFixed(9) : '') +
     '},"geometry":{"type":"Point","coordinates":[' +

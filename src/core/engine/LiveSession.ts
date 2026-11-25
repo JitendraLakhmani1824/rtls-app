@@ -33,6 +33,8 @@ export type LiveSessionDeps = {
   device: DeviceManager;
   perf: Perf;
   profile: SessionProfile;
+  /** Shown as the screen title. */
+  title?: string;
 };
 
 const TICK_MS = 1000;
@@ -88,8 +90,11 @@ export class LiveSession implements Session {
   private readonly stillSoon: ReturnType<typeof throttle>;
   private readonly deps: LiveSessionDeps;
 
+  readonly title: string;
+
   constructor(deps: LiveSessionDeps) {
     this.deps = deps;
+    this.title = deps.title ?? 'Live';
     const clock = deps.device.clock;
     this.budget = budgetFor(deps.device.power.get());
     this.gestureMoving = throttle(
@@ -137,6 +142,11 @@ export class LiveSession implements Session {
 
   select(member: number | null) {
     this.selected.set(member);
+    if (member !== null && this.store.has(member)) {
+      // Bring the friend into view above the sheet; the camera is now the user's, so no re-fitting.
+      this.cameraFree = true;
+      this.deps.map.centerOn(this.store.lng(member), this.store.lat(member));
+    }
     this.deps.map.setSelected(member);
     if (this.presenter.updateGliding(this.store, member)) this.sendMoving();
     this.stillDirty = true;

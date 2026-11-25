@@ -1,11 +1,5 @@
 import { useManagers, useRows } from '@common/di';
-import {
-  formatAgo,
-  formatDirection,
-  formatDistance,
-  formatMovement,
-  presenceLabel,
-} from '@common/utils';
+import { formatAgo, formatDirection, formatDistance, formatMovement } from '@common/utils';
 import { Presence, type FriendRow } from '@core/models';
 
 export type FriendItem = {
@@ -13,43 +7,40 @@ export type FriendItem = {
   name: string;
   initials: string;
   colour: string;
-  detail: string;
-  dimmed: boolean;
+  presence: number;
+  /** "Live · walking", "Last seen 10 min ago", "Paused sharing". */
+  status: string;
+  /** "350 m", or "" when unknown. */
+  distance: string;
+  /** "NE", or "". */
+  direction: string;
+  bearingDeg: number;
 };
 
-/**
- * The friend list. Used only by the list itself, which mounts only while the panel is open — so the
- * session computes rows only while someone can see them.
- */
+/** The friend list: mounted only while the panel is open. */
 export function useFriendList() {
   const { session } = useManagers();
   const rows = useRows();
-  return {
-    items: rows.map(toItem),
-    select: (id: number) => session.select(id),
-  };
+  return { items: rows.map(toItem), select: (id: number) => session.select(id) };
 }
 
 export function toItem(row: FriendRow): FriendItem {
-  const where = Number.isFinite(row.distanceM)
-    ? `${formatDistance(row.distanceM)} ${formatDirection(row.bearingDeg)}`.trim()
-    : '';
-  let detail: string;
-  if (row.presence === Presence.Paused) detail = presenceLabel(row.presence);
-  else if (row.presence === Presence.Live)
-    detail = [presenceLabel(row.presence), where, formatMovement(row.speedMs)]
-      .filter(Boolean)
-      .join(' · ');
-  else
-    detail = [`${presenceLabel(row.presence)} ${formatAgo(row.silentMs)}`, where]
-      .filter(Boolean)
-      .join(' · ');
+  let status: string;
+  if (row.presence === Presence.Live)
+    status = ['Live', formatMovement(row.speedMs)].filter(Boolean).join(' · ');
+  else if (row.presence === Presence.Recent) status = `Active ${formatAgo(row.silentMs)}`;
+  else if (row.presence === Presence.Paused) status = 'Paused sharing';
+  else status = `Last seen ${formatAgo(row.silentMs)}`;
+  const known = Number.isFinite(row.distanceM);
   return {
     id: row.id,
     name: row.name,
     initials: row.initials,
     colour: row.colour,
-    detail,
-    dimmed: row.presence !== Presence.Live,
+    presence: row.presence,
+    status,
+    distance: known ? formatDistance(row.distanceM) : '',
+    direction: known ? formatDirection(row.bearingDeg) : '',
+    bearingDeg: row.bearingDeg,
   };
 }

@@ -19,6 +19,7 @@ const STOP_S = 45;
 
 /** A convoy: friends ride in cars of up to four, at 12–25 m/s, with occasional stops. Cars turn back at the road's end. */
 export const trip: Scenario = {
+  title: 'Road trip',
   profile: 'trip',
   zoom: 11.5,
   create(rng, people) {

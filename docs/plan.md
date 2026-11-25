@@ -223,6 +223,12 @@ Most code is written with LLMs. The setup is lean on text and strong on automati
 | **M5** | Screens | Home (panel, camera buttons, connection badge) + Detail sheet (or the fallback); screen tests | 1 day |
 | **M6** | Results + write-up + share | 12-cell matrix + energy step; LLD results and summary; README (code tour, AI use); scripted video; EAS builds | 1 day |
 
+**As built (scope trimmed in M3–M6: the brief judges smooth pins, battery and structure, not scale tuning):**
+- M3: ladder recorded at 200 friends only; the 1,000-friend re-run and the label-fade comparison were dropped.
+- M4: viewer energy not measured; Low Power Mode wired (expo-battery), heat not (needs a native module).
+- M5: camera buttons dropped; the map frames everyone automatically. Default session is 10 friends.
+- M6: no 12-cell matrix or energy step; README, demo video and an EAS APK instead.
+
 | Priority | What |
 | --- | --- |
 | **P0** | Spike + sheet check, HLD, engine, four sources + speed budget, ladder A–D, battery model table, Home + Detail, LLD results, README, video, APK, AI setup |

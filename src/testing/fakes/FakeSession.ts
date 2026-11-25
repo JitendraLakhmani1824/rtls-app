@@ -4,6 +4,7 @@ import { createStore } from '@core/utils';
 
 /** A session for screen tests: set its values by hand; it records what screens ask of it. */
 export class FakeSession implements Session {
+  readonly title = 'Test session';
   readonly selected = createStore<number | null>(null);
   readonly connection = createStore<ConnState>({ kind: 'live', sinceMs: 0 });
   readonly rows = createStore<FriendRow[]>([]);

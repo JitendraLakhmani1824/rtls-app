@@ -1,9 +1,10 @@
+import { Avatar, colors, DirectionArrow } from '@common/ui';
 import { memo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useFriendList, type FriendItem } from '../useFriendList';
 
-const ROW_HEIGHT = 56;
+const ROW_HEIGHT = 64;
 
 export function FriendList() {
   const { items, select } = useFriendList();
@@ -13,9 +14,14 @@ export function FriendList() {
       keyExtractor={(item) => String(item.id)}
       getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
       renderItem={({ item }) => <Row item={item} onSelect={select} />}
+      ItemSeparatorComponent={Separator}
       ListEmptyComponent={<Text style={styles.empty}>Waiting for friends…</Text>}
     />
   );
+}
+
+function Separator() {
+  return <View style={styles.separator} />;
 }
 
 const Row = memo(function Row({
@@ -30,19 +36,26 @@ const Row = memo(function Row({
       onPress={() => onSelect(item.id)}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name}, ${item.detail}`}
+      accessibilityLabel={`${item.name}, ${item.status}${item.distance ? `, ${item.distance} ${item.direction}` : ''}`}
     >
-      <View style={[styles.dot, { backgroundColor: item.colour }, item.dimmed && styles.dimmed]}>
-        <Text style={styles.initials}>{item.initials}</Text>
-      </View>
+      <Avatar initials={item.initials} colour={item.colour} presence={item.presence} size={44} />
       <View style={styles.text}>
         <Text style={styles.name} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text style={styles.detail} numberOfLines={1}>
-          {item.detail}
+        <Text style={styles.status} numberOfLines={1}>
+          {item.status}
         </Text>
       </View>
+      {item.distance ? (
+        <View style={styles.where}>
+          <Text style={styles.distance}>{item.distance}</Text>
+          <View style={styles.direction}>
+            <DirectionArrow bearingDeg={item.bearingDeg} size={12} />
+            <Text style={styles.compass}>{item.direction}</Text>
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 });
@@ -52,15 +65,17 @@ const styles = StyleSheet.create({
     height: ROW_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 20,
+    gap: 14,
   },
-  pressed: { backgroundColor: '#f1f5f9' },
-  dot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  dimmed: { opacity: 0.45 },
-  initials: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  pressed: { backgroundColor: colors.subtle },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginLeft: 78 },
   text: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  detail: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  empty: { padding: 16, color: '#64748b' },
+  name: { fontSize: 16, fontWeight: '600', color: colors.ink },
+  status: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  where: { alignItems: 'flex-end' },
+  distance: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  direction: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  compass: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  empty: { padding: 20, color: colors.muted },
 });

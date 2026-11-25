@@ -8,12 +8,12 @@ import type { SharedValue } from 'react-native-reanimated';
  * points at zoom 0, as the layer wants it), with a version to spot changes.
  */
 export type MotionInput = { version: number; entries: number[] };
-export type MemberTable = { colours: string[]; initials: string[] };
-/** "Show these bounds", from the session; `seq` makes a repeated request a new value. */
-export type CameraCommand = {
-  seq: number;
-  bounds: [west: number, south: number, east: number, north: number];
-};
+/** Per member, for the worklet. Initials and names are already JSON strings (quoted, escaped). */
+export type MemberTable = { colours: string[]; initials: string[]; names: string[] };
+/** A camera move asked for by the session; `seq` makes a repeated request a new value. */
+export type CameraCommand =
+  | { seq: number; kind: 'fit'; bounds: [west: number, south: number, east: number, north: number] }
+  | { seq: number; kind: 'center'; center: [lng: number, lat: number] };
 
 /** Where the selected friend's drawn trail ends; the worklet joins it to the gliding pin. */
 export type TrailTip = { version: number; lng: number; lat: number };
@@ -27,6 +27,8 @@ export interface MapViewModel {
   /** The selected member, for the still pins' feature state. */
   readonly selection: Store<number | null>;
   readonly trailData: Store<string>;
+  /** My own position, drawn apart from friends and on top of them. */
+  readonly meData: Store<string>;
   /** The map's preferredFramesPerSecond. */
   readonly mapFps: Store<number>;
   readonly motion: SharedValue<MotionInput>;

@@ -1,5 +1,6 @@
 export {
   formatAgo,
+  formatClock,
   formatDirection,
   formatDistance,
   formatMovement,

@@ -22,10 +22,22 @@ describe('StillEncoder', () => {
 });
 
 describe('encodeStill', () => {
+  it('leaves me out: my pin has its own layer and is never grouped with friends', () => {
+    const json = encodeStill(frame([0, 72, 19, 0, 0], [1, 72, 19, 0, 0]), fakeMembers(2));
+    expect(JSON.parse(json).features.map((f: { id: number }) => f.id)).toEqual([1]);
+  });
+
+  it('escapes names so any name is valid JSON', () => {
+    const members = fakeMembers(2).map((m) => ({ ...m, name: 'Sam "the" \\ Runner' }));
+    expect(
+      JSON.parse(encodeStill(frame([1, 72, 19, 0, 0]), members)).features[0].properties.n,
+    ).toBe('Sam "the" \\ Runner');
+  });
+
   it('matches the expected GeoJSON exactly', () => {
     const json = encodeStill(frame([1, 72.5, 19.25, 0, 0]), fakeMembers(2));
     expect(json).toBe(
-      '{"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"m":1,"c":"#334155","t":"F1","p":0},"geometry":{"type":"Point","coordinates":[72.500000,19.250000]}}]}',
+      '{"type":"FeatureCollection","features":[{"type":"Feature","id":1,"properties":{"m":1,"c":"#334155","t":"F1","n":"Friend 1","p":0},"geometry":{"type":"Point","coordinates":[72.500000,19.250000]}}]}',
     );
   });
 
@@ -35,7 +47,7 @@ describe('encodeStill', () => {
   });
 
   it('gives a poorly located pin a halo that is true to metres on screen', () => {
-    const json = encodeStill(frame([0, 72, 19, 0, 0], [1, 72, 19, 0, 100]), fakeMembers(2));
+    const json = encodeStill(frame([1, 72, 19, 0, 0], [2, 72, 19, 0, 100]), fakeMembers(3));
     const [plain, poor] = JSON.parse(json).features as { properties: { h?: number } }[];
     expect(plain?.properties.h).toBeUndefined();
     // The layer doubles h per zoom level: at zoom 16, 100 m is 100 / metersPerPoint(16, 19) points.

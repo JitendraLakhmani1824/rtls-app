@@ -40,7 +40,18 @@ describe('useHome', () => {
     const managers = createTestManagers();
     managers.session.connection.set({ kind: 'reconnecting', sinceMs: 0 });
     const { result } = await renderHook(() => useHome(), { wrapper: wrapper(managers) });
-    expect(result.current.connection.label).toBe('Connecting…');
+    expect(result.current.connection.label).toBe('Reconnecting…');
+    const at = new Date(2026, 10, 26, 14, 5).getTime();
+    await act(() => managers.session.connection.set({ kind: 'offline', sinceMs: at }));
+    expect(result.current.connection.label).toBe('Offline · as of 14:05');
+  });
+
+  it('counts who is live for the title card', async () => {
+    const managers = createTestManagers();
+    managers.session.rows.set([fakeRow(1), fakeRow(2), fakeRow(3, { presence: 2 })]);
+    const { result } = await renderHook(() => useHome(), { wrapper: wrapper(managers) });
+    expect(result.current.summary).toBe('2 of 3 friends live');
+    expect(result.current.title).toBe('Test session');
   });
 
   it('opens and closes the friend list', async () => {
@@ -63,13 +74,16 @@ describe('useFriendList', () => {
     expect(managers.session.calls).toEqual(['select 2']);
   });
 
-  it('describes each friend in one line', async () => {
-    expect(toItem(fakeRow(1, { distanceM: 350, bearingDeg: 45, speedMs: 1.2 })).detail).toBe(
-      'Live · 350 m NE · walking',
+  it('describes each friend in words, with distance and direction apart', () => {
+    expect(toItem(fakeRow(1, { distanceM: 350, bearingDeg: 45, speedMs: 1.2 }))).toMatchObject({
+      status: 'Live · walking',
+      distance: '350 m',
+      direction: 'NE',
+    });
+    expect(toItem(fakeRow(2, { presence: 2, silentMs: 600_000 })).status).toBe(
+      'Last seen 10 min ago',
     );
-    expect(toItem(fakeRow(2, { presence: 2, silentMs: 600_000, distanceM: 1234 })).detail).toBe(
-      'Last seen 10 min ago · 1.2 km NE',
-    );
-    expect(toItem(fakeRow(3, { presence: 3 })).detail).toBe('Paused sharing');
+    expect(toItem(fakeRow(3, { presence: 1, silentMs: 90_000 })).status).toBe('Active 2 min ago');
+    expect(toItem(fakeRow(4, { presence: 3 })).status).toBe('Paused sharing');
   });
 });

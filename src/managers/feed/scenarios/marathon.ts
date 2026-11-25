@@ -17,6 +17,7 @@ const RUNNER_SHARE = 0.75;
 
 /** A race: ~75% run the loop at 2.4–4.2 m/s; the rest watch from spots along the route. */
 export const marathon: Scenario = {
+  title: 'City Marathon',
   profile: 'race',
   zoom: 14,
   create(rng, people) {

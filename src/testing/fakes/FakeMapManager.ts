@@ -27,6 +27,8 @@ export class FakeMapManager implements MapManager {
   readonly frameRateCaps: number[] = [];
   /** Every fitTo, as [west, south, east, north]. */
   readonly fits: number[][] = [];
+  /** Every centerOn, as [lng, lat]. */
+  readonly centers: number[][] = [];
   private pressListeners = new Set<(member: number) => void>();
 
   setMembers(members: Member[]) {
@@ -54,6 +56,9 @@ export class FakeMapManager implements MapManager {
   }
   fitTo(west: number, south: number, east: number, north: number) {
     this.fits.push([west, south, east, north]);
+  }
+  centerOn(lng: number, lat: number) {
+    this.centers.push([lng, lat]);
   }
   setFrameRateCap(fps: number) {
     this.frameRateCaps.push(fps);

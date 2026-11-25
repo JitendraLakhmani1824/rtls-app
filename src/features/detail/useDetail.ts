@@ -30,27 +30,34 @@ export function useDetail() {
     [navigation, session],
   );
 
+  if (!row) return { friend: null, close: () => navigation.goBack() };
+  const known = Number.isFinite(row.distanceM);
+  const movement = formatMovement(row.speedMs);
   return {
-    friend: row
-      ? {
-          name: row.name,
-          initials: row.initials,
-          colour: row.colour,
-          status:
-            row.presence === Presence.Live
-              ? `Live · updated ${formatAgo(row.silentMs)}`
-              : row.presence === Presence.Paused
-                ? presenceLabel(row.presence)
-                : `${presenceLabel(row.presence)} ${formatAgo(row.silentMs)}`,
-          where: Number.isFinite(row.distanceM)
-            ? `${formatDistance(row.distanceM)} ${formatDirection(row.bearingDeg)} of you`.replace(
-                '  ',
-                ' ',
-              )
-            : 'Location not known yet',
-          movement: formatMovement(row.speedMs),
-        }
-      : null,
+    friend: {
+      name: row.name,
+      initials: row.initials,
+      colour: row.colour,
+      presence: row.presence,
+      /** Chip text: "Live", "Active 2 min ago", "Last seen 10 min ago", "Paused sharing". */
+      status:
+        row.presence === Presence.Live
+          ? 'Live'
+          : row.presence === Presence.Recent
+            ? `Active ${formatAgo(row.silentMs)}`
+            : row.presence === Presence.Paused
+              ? presenceLabel(row.presence)
+              : `${presenceLabel(row.presence)} ${formatAgo(row.silentMs)}`,
+      updated: `Updated ${formatAgo(row.silentMs)}`,
+      distance: known ? formatDistance(row.distanceM) : '—',
+      direction: known ? formatDirection(row.bearingDeg) : '—',
+      bearingDeg: row.bearingDeg,
+      movement: movement ? movement[0]?.toUpperCase() + movement.slice(1) : 'Still',
+      /** One line for screen readers and the summary under the name. */
+      where: known
+        ? `${formatDistance(row.distanceM)} ${formatDirection(row.bearingDeg)} of you`
+        : 'Location not known yet',
+    },
     close: () => navigation.goBack(),
   };
 }

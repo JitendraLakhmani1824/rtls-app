@@ -53,4 +53,4 @@ Built with Claude Code. The repository is set up so an assistant follows the arc
 
 ## Not built
 
-A real server and real GPS, camera buttons, measured viewer energy, and the real Low Power Mode and heat signals (the seam is `DeviceManager.power`).
+A real server and real GPS, camera buttons, measured viewer energy, and the phone's heat signal (Low Power Mode is wired; heat needs a small native module behind `DeviceManager.power`).

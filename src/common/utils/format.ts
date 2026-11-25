@@ -38,3 +38,10 @@ export function formatMovement(speedMs: number): string {
   if (speedMs < 2.5) return 'walking';
   return speedMs < 7 ? 'running' : 'driving';
 }
+
+/** "14:05" — a time of day, for "positions as of 14:05". */
+export function formatClock(epochMs: number): string {
+  if (!Number.isFinite(epochMs) || epochMs <= 0) return '';
+  const d = new Date(epochMs);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}

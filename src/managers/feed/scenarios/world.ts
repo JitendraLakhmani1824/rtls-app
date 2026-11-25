@@ -13,6 +13,8 @@ export interface World {
 export type ScenarioName = 'concert' | 'marathon' | 'trip';
 
 export type Scenario = {
+  /** Shown as the session's title. */
+  title: string;
   profile: SessionProfile['name'];
   /** Comfortable starting zoom for the whole scene. */
   zoom: number;

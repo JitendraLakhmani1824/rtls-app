@@ -510,14 +510,15 @@ stateDiagram-v2
 - **Shape:** `XScreen` wires `useX()` to views. `useX` is the only file that uses `useManagers()` and navigation, and returns data + actions. Function components only; the one class is `ErrorBoundary`.
 - **Snapshot hooks:** `useRows()`, `useSelected()`, `useConnection()` — `useSyncExternalStore` over the session's readables. Nothing subscribes to per-frame data. The friend list mounts only when the panel is expanded, so collapsed means `rows` is never computed.
 - **Text:** the snapshot carries distance and bearing from me, and age, as numbers; rows arrive sorted by distance. `common/utils` formats "350 m NE" and "updated 10 s ago".
-- **Home:** full-screen `MapView`, connection badge, friend list panel (fixed-height rows, mounted only while open). Tapping a row calls `session.select(id)`. When `selected` becomes non-null, `useHome` navigates to `Friend`.
+- **Home:** full-screen `MapView`; a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05"); a demo-scenario picker that reopens the app's own scenario link; the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`, which centres the friend above the sheet. When `selected` becomes non-null, `useHome` navigates to `Friend` and hides the panel: one bottom surface at a time.
+- **Markers:** friends are initials in their colour with a white ring and shadow; Recent fades, Stale turns grey; names show from zoom 16. The selected friend gets a soft glow, a white ring in their colour, their name, and a one-off ripple (no endless animation). Me is a blue dot with a halo in its own source: never grouped, always on top.
 - **Detail:** React Navigation native-stack screen `Friend`:
   - `presentation: 'formSheet'`;
   - at most three fixed `sheetAllowedDetents`;
   - `sheetLargestUndimmedDetentIndex` set, so the map stays undimmed and touchable;
   - `contentStyle.backgroundColor` set.
 
-  It shows status, last seen, distance + direction and movement. `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
+  It shows a status chip, distance, a direction arrow, movement and "updated … ago". `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
 - **Fallback:** if the M0 sheet check fails on Android, the detail card renders inside Home's panel.
 - **Launch parameters:** `app/launch-params.ts` reads a deep link (`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&rung=D&faults=drops,jumps`) or the dev scenario picker and builds the container from it. The ladder rung is fixed at launch, so production code never checks it.
 - **Layout:** portrait only. Layout reads window size, never screen size.

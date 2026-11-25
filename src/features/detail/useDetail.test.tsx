@@ -37,7 +37,11 @@ describe('useDetail', () => {
     const { result } = await setup();
     expect(result.current.friend).toMatchObject({
       name: 'Friend 1',
-      status: 'Live · updated just now',
+      status: 'Live',
+      updated: 'Updated just now',
+      distance: '350 m',
+      direction: 'E',
+      movement: 'Still',
       where: '350 m E of you',
     });
   });

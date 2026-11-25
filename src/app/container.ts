@@ -45,6 +45,7 @@ export function createContainer(params: LaunchParams): Container {
     device,
     perf: recorder ?? noopPerf,
     profile: PROFILES[scenario.profile],
+    title: scenario.title,
   });
 
   return {

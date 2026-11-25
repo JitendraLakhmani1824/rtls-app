@@ -1,71 +1,104 @@
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { colors, radius, shadow } from '@common/ui';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHome } from './useHome';
+import { useScenarioPicker } from './useScenarioPicker';
 import { FriendList } from './views/FriendList';
+import { FriendsPanel } from './views/FriendsPanel';
+import { ScenarioPicker } from './views/ScenarioPicker';
 
-/** The live map, with a connection badge and the friend list panel. */
+const CONNECTION_COLORS = {
+  live: { color: colors.live, soft: colors.liveSoft },
+  reconnecting: { color: colors.recent, soft: colors.recentSoft },
+  offline: { color: colors.danger, soft: colors.dangerSoft },
+} as const;
+
+/** The live map, a title card with the connection state, and the friends panel. */
 export function HomeScreen() {
-  const { MapView, connection, showPanel, listOpen, toggleList } = useHome();
+  const home = useHome();
+  const picker = useScenarioPicker();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const tone = CONNECTION_COLORS[home.connection.kind];
+  const { MapView } = home;
   return (
     <View style={styles.fill}>
       <MapView />
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + 8 }]}>
-        <View style={[styles.badge, connection.kind !== 'live' && styles.badgeWarn]}>
-          <Text style={styles.badgeText}>{connection.label}</Text>
+        <View style={[styles.card, shadow]}>
+          <View style={styles.cardText}>
+            <Text style={styles.title} numberOfLines={1}>
+              {home.title}
+            </Text>
+            <Text style={styles.summary} numberOfLines={1}>
+              {home.summary}
+            </Text>
+          </View>
+          <View
+            style={[styles.pill, { backgroundColor: tone.soft }]}
+            accessibilityLabel={`Connection: ${home.connection.label}`}
+          >
+            <View style={[styles.pillDot, { backgroundColor: tone.color }]} />
+            <Text style={[styles.pillText, { color: tone.color }]}>{home.connection.label}</Text>
+          </View>
         </View>
+        <Pressable
+          onPress={picker.open}
+          style={[styles.roundButton, shadow]}
+          accessibilityRole="button"
+          accessibilityLabel="Demo scenario"
+        >
+          <Text style={styles.roundButtonText}>⋯</Text>
+        </Pressable>
       </View>
-      {showPanel && (
-        <View style={[styles.panel, { paddingBottom: insets.bottom }]}>
-          <Pressable onPress={toggleList} style={styles.handle} accessibilityRole="button">
-            <View style={styles.grabber} />
-            <Text style={styles.handleText}>{listOpen ? 'Hide friends' : 'Friends'}</Text>
-          </Pressable>
-          {listOpen && (
-            <View style={{ maxHeight: height * 0.4 }}>
-              <FriendList />
-            </View>
-          )}
-        </View>
+      {home.showPanel && (
+        <FriendsPanel
+          open={home.listOpen}
+          onToggle={home.toggleList}
+          live={home.live}
+          away={home.away}
+          preview={home.preview}
+        >
+          <FriendList />
+        </FriendsPanel>
       )}
+      <ScenarioPicker picker={picker} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  top: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
+  top: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', gap: 10 },
+  card: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
   },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(15,23,42,0.85)',
+  cardText: { flex: 1 },
+  title: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  summary: { fontSize: 13, color: colors.muted, marginTop: 1 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
   },
-  badgeWarn: { backgroundColor: 'rgba(180,83,9,0.9)' },
-  badgeText: { color: '#ffffff', fontSize: 13, fontWeight: '600' },
-  panel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 8,
+  pillDot: { width: 7, height: 7, borderRadius: 4 },
+  pillText: { fontSize: 13, fontWeight: '700' },
+  roundButton: {
+    width: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  handle: { alignItems: 'center', paddingTop: 8, paddingBottom: 12 },
-  grabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#cbd5e1', marginBottom: 8 },
-  handleText: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
+  roundButtonText: { fontSize: 22, fontWeight: '700', color: colors.ink, marginTop: -6 },
 });

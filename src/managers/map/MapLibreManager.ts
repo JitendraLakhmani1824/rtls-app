@@ -1,5 +1,6 @@
 import {
   MOTION_STRIDE,
+  PIN_STRIDE,
   type Member,
   type MotionFrame,
   type PinFrame,
@@ -12,7 +13,7 @@ import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import type { ComponentType } from 'react';
 import { makeMutable } from 'react-native-reanimated';
 
-import { EMPTY_FC, encodeTrails, haloPoints, StillEncoder, trailTipFrom } from './encode';
+import { EMPTY_FC, encodeMe, encodeTrails, haloPoints, StillEncoder, trailTipFrom } from './encode';
 import positron from '../../../assets/map-style/positron.json';
 import { createMapView } from './MapView';
 import type { CameraCommand, MapViewModel, MemberTable, MotionInput, TrailTip } from './viewModel';
@@ -43,9 +44,10 @@ export class MapLibreManager implements MapManager, MapViewModel {
   readonly selection = createStore<number | null>(null);
   readonly cameraCommand = createStore<CameraCommand | null>(null);
   readonly trailData = createStore(EMPTY_FC);
+  readonly meData = createStore(EMPTY_FC);
   readonly mapFps = createStore(60);
   readonly motion = makeMutable<MotionInput>({ version: 0, entries: [] });
-  readonly table = makeMutable<MemberTable>({ colours: [], initials: [] });
+  readonly table = makeMutable<MemberTable>({ colours: [], initials: [], names: [] });
   readonly selectedMember = makeMutable(-1);
   readonly glideFrameMs = makeMutable(MIN_GLIDE_FRAME_MS);
   readonly trailTip = makeMutable<TrailTip>({ version: 0, lng: NaN, lat: NaN });
@@ -53,6 +55,7 @@ export class MapLibreManager implements MapManager, MapViewModel {
 
   private members: Member[] = [];
   private selected: number | null = null;
+  private me = -1;
   private readonly pressListeners = new Set<(member: number) => void>();
 
   private readonly stillEncoder = new StillEncoder();
@@ -76,23 +79,39 @@ export class MapLibreManager implements MapManager, MapViewModel {
 
   setMembers(members: Member[]) {
     this.members = members;
+    this.me = members.findIndex((m) => m.isMe);
     this.stillEncoder.setMembers(members);
     this.table.value = {
       colours: members.map((m) => m.colour),
-      initials: members.map((m) => m.initials),
+      initials: members.map((m) => JSON.stringify(m.initials)),
+      names: members.map((m) => JSON.stringify(m.name)),
     };
   }
 
   setStill(frame: PinFrame) {
     // Encoded now: the sender reuses its buffer.
     this.stillData.set(this.perf.measure('encodeStill', () => this.stillEncoder.encode(frame)));
+    for (let o = 0; o < frame.n * PIN_STRIDE; o += PIN_STRIDE) {
+      if (frame.buf[o] === this.me)
+        this.placeMe(frame.buf[o + 1], frame.buf[o + 2], frame.buf[o + 4]);
+    }
   }
 
   setMoving(frame: MotionFrame) {
-    this.motion.value = {
-      version: this.motion.value.version + 1,
-      entries: haloInPoints(Array.from(frame.buf.subarray(0, frame.n * MOTION_STRIDE))),
-    };
+    // Me is drawn by its own layer: take it out of the gliding set.
+    const entries: number[] = [];
+    for (let o = 0; o < frame.n * MOTION_STRIDE; o += MOTION_STRIDE) {
+      if (frame.buf[o] === this.me) {
+        this.placeMe(frame.buf[o + 1], frame.buf[o + 2], frame.buf[o + 4]);
+        continue;
+      }
+      for (let k = 0; k < MOTION_STRIDE; k++) entries.push(frame.buf[o + k] ?? NaN);
+    }
+    this.motion.value = { version: this.motion.value.version + 1, entries: haloInPoints(entries) };
+  }
+
+  private placeMe(lng = NaN, lat = NaN, haloM = 0) {
+    this.meData.set(encodeMe(lng, lat, haloM));
   }
 
   setTrails(frame: TrailFrame) {
@@ -113,7 +132,12 @@ export class MapLibreManager implements MapManager, MapViewModel {
 
   fitTo(west: number, south: number, east: number, north: number) {
     const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
-    this.cameraCommand.set({ seq, bounds: [west, south, east, north] });
+    this.cameraCommand.set({ seq, kind: 'fit', bounds: [west, south, east, north] });
+  }
+
+  centerOn(lng: number, lat: number) {
+    const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
+    this.cameraCommand.set({ seq, kind: 'center', center: [lng, lat] });
   }
 
   setSelected(member: number | null) {
