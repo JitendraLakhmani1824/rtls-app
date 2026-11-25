@@ -1,5 +1,9 @@
 import { FIX_STRIDE, PRESENCE_STRIDE, type FixBatch, type PresenceBatch } from '../models';
 import { distanceMeters } from '../utils';
+import { expectedIntervalMs, PAUSED_PRESENCE, presenceOf } from './presence';
+
+/** Above this accuracy (m) a fix is poor: it doesn't extend the trail, and its pin shows an accuracy halo. */
+export const POOR_ACCURACY_M = 50;
 
 // Per member, preallocated in one Float64Array.
 const STRIDE = 13;
@@ -179,6 +183,24 @@ export class LocationStore {
   paused(m: number) {
     return this.data[m * STRIDE + PAUSED] === 1;
   }
+  /**
+   * Live / Recent / Stale right now, or PAUSED_PRESENCE. One call with direct reads, because the
+   * presenter asks for every member each second.
+   */
+  presence(m: number, now: number): number {
+    const d = this.data;
+    const b = m * STRIDE;
+    if (d[b + PAUSED] === 1) return PAUSED_PRESENCE;
+    const interval = (d[b + T] ?? NaN) - (d[b + PREV_T] ?? NaN);
+    return presenceOf(now, d[b + HEARD] ?? NaN, expectedIntervalMs(d[b + SPEED] ?? 0, interval));
+  }
+
+  /** The accuracy radius to draw around a poorly located pin; 0 for none. */
+  halo(m: number) {
+    const accuracy = this.data[m * STRIDE + ACC] ?? NaN;
+    return accuracy > POOR_ACCURACY_M ? accuracy : 0;
+  }
+
   /** True if the latest fix was a confirmed jump. */
   snapped(m: number) {
     return this.data[m * STRIDE + SNAP] === 1;

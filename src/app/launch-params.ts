@@ -2,8 +2,12 @@ import { FAULTS, SCENARIOS, type Fault, type ScenarioName } from '@managers/feed
 import { useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 
-/** Ladder rungs (design §2.10): A = one Marker per friend in React state, D = the real engine. B/C arrive in M3. */
-export type Rung = 'A' | 'D';
+/**
+ * Ladder rungs (design §2.10): A = one Marker per friend in React state; B = one source, sent per batch;
+ * C = B + per-frame batching and on-screen only; D = the real engine.
+ */
+export type Rung = 'A' | 'B' | 'C' | 'D';
+const RUNGS: readonly Rung[] = ['A', 'B', 'C', 'D'];
 
 export type LaunchParams = {
   scenario: ScenarioName;
@@ -16,16 +20,19 @@ export type LaunchParams = {
   faults: Fault[];
   /** Print a PERF line per second. */
   perf: boolean;
+  /** Experiment: label fade-in after map updates, ms (MapLibre's default is 300). */
+  fadeMs: number;
 };
 
 export const DEFAULT_PARAMS: LaunchParams = {
   scenario: 'concert',
-  friends: 200,
+  friends: 10, // a real group of friends; scale runs pass friends= in the link
   seed: 42,
   intervalMs: 1000,
   rung: 'D',
   faults: [],
   perf: __DEV__,
+  fadeMs: 0,
 };
 
 const clampInt = (value: string | undefined, min: number, max: number, fallback: number) => {
@@ -55,12 +62,13 @@ export function parseLaunchUrl(
     friends: clampInt(query.friends, 1, 5000, defaults.friends),
     seed: clampInt(query.seed, 0, 2 ** 31 - 1, defaults.seed),
     intervalMs: clampInt(query.interval, 100, 60_000, defaults.intervalMs),
-    rung: query.rung === 'A' ? 'A' : query.rung === 'D' ? 'D' : defaults.rung,
+    rung: RUNGS.find((r) => r === query.rung) ?? defaults.rung,
     faults:
       query.faults === undefined
         ? defaults.faults
         : FAULTS.filter((f) => query.faults?.split(',').includes(f)),
     perf: query.perf === undefined ? defaults.perf : query.perf === '1',
+    fadeMs: clampInt(query.fade, 0, 1000, defaults.fadeMs),
   };
 }
 

@@ -4,6 +4,11 @@ Short log of choices made after the plan was closed. Newest first.
 
 | Date | Decision | Why | Cost / revisit when |
 | --- | --- | --- | --- |
+| 2026-11-26 | Ladder rungs B and C build a GeoJSON object per pin (the common way) and pass it through React state; no clustering, no gliding | They stand for what a typical app does, so each later step's gain is visible | — |
+| 2026-11-26 | `PerfRecorder` reports event-loop lag beyond one frame (`jsLagMs`), long tasks (> 50 ms) and Hermes GCs | jsFps alone hides busy-but-not-dropping JS. React Native fires timers on frame boundaries, so up to 17 ms late is normal and not counted | — |
+| 2026-11-26 | Late fixes in `withFaults` arrive 1–2 s late (was one 250 ms batch) | A friend sends one fix a second, so one batch late rarely landed after a newer fix: the fault wasn't testing out-of-order delivery | — |
+| 2026-11-26 | Accuracy halo travels in both `PinFrame` and `MotionFrame` (`haloM`, 5 numbers each) | The selected friend glides (so a cluster never hides it) and must keep its halo | — |
+| 2026-11-26 | Selection ring on still pins via feature state; `setSelected` no longer re-encodes still pins | Selecting is paint-only. The selected friend usually glides, so the ring mostly comes from the moving source's `s` flag | — |
 | 2026-11-26 | Who glides is re-decided on the 1 s tick (with the still frame), and a gliding pin keeps gliding down to 1 point/s (starts at 2) | Deciding on every batch made walkers flap in and out of gliding with GPS noise: the still source went out ~3×/s and pins showed twice between sources. Replay: still frames 164 → 63 per minute | A pin starts gliding up to 1 s late |
 | 2026-11-26 | The GPS-jump speed check subtracts both fixes' accuracy from the distance | Normal noise at 1 Hz (a few metres) exceeded the 4 m/s event limit, so walkers' pins snapped instead of gliding | — |
 | 2026-11-26 | `Live` window has a 10 s floor (2.5× the interval, at least 10 s) | At 1 s fixes, two lost fixes flickered a walker to `Recent` | — |

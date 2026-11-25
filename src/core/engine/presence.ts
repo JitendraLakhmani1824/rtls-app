@@ -8,6 +8,15 @@ export const LIVE_FACTOR = 2.5;
 export const LIVE_MIN_MS = 10_000;
 /** Recent up to this long; Stale after. */
 export const RECENT_MAX_MS = 5 * 60_000;
+/** Slower than this (m/s) is standing still: we expect heartbeats, not fixes. */
+export const MOVING_MS = 0.5;
+/** Presence code for a member who paused sharing (not drawn). */
+export const PAUSED_PRESENCE = 3;
+
+/** How often we expect to hear from a member: their fix interval while moving, the heartbeat while still. */
+export function expectedIntervalMs(speedMs: number, fixIntervalMs: number): number {
+  return speedMs >= MOVING_MS && Number.isFinite(fixIntervalMs) ? fixIntervalMs : HEARTBEAT_MS;
+}
 
 /**
  * Live / Recent / Stale from when we last heard from the member, not from GPS movement,

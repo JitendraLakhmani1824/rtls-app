@@ -19,7 +19,14 @@ describe('parseLaunchUrl', () => {
       faults: ['drops', 'jumps'],
       rung: 'A',
       perf: true,
+      fadeMs: 0,
     });
+  });
+
+  it('reads every ladder rung', () => {
+    expect(
+      ['A', 'B', 'C', 'D'].map((r) => parseLaunchUrl(`rtls://scenario?rung=${r}`).rung),
+    ).toEqual(['A', 'B', 'C', 'D']);
   });
 
   it('clamps out-of-range numbers and ignores unknown names, rungs and faults', () => {

@@ -1,5 +1,6 @@
 import { FIX_STRIDE, PIN_STRIDE, PROFILES, Presence, TRAIL_STRIDE, type Viewport } from '../models';
-import { metersPerPoint, Presenter, TRAILS_FOR_ALL_MAX } from './presenter';
+import { metersPerPoint } from '../utils';
+import { Presenter, TRAILS_FOR_ALL_MAX } from './presenter';
 import { LocationStore } from './store';
 import { TrailStore } from './trails';
 
@@ -67,6 +68,33 @@ describe('Presenter', () => {
     });
   });
 
+  it('checks only the members that moved, with the same result as a full pass', () => {
+    const rng = { s: 7, next: () => (rng.s = (rng.s * 16807) % 2147483647) / 2147483647 };
+    const fixes: Fix[] = Array.from({ length: 50 }, (_, m) => [
+      m,
+      1,
+      72 + (rng.next() - 0.5) * 0.04,
+      19,
+      0,
+    ]);
+    const store = storeWith(50, ...fixes);
+    const incremental = presenterAt(view(15));
+    const full = presenterAt(view(15));
+    incremental.updateVisibility(store);
+    full.updateVisibility(store);
+    const moved = [3, 17, 42];
+    const buf = new Float64Array(moved.length * FIX_STRIDE);
+    moved.forEach((m, i) =>
+      buf.set([m, 2, 72.0005 * (i + 1) - 0.0005 * i * 2, 19, 1000, 5], i * FIX_STRIDE),
+    );
+    store.ingest({ n: moved.length, buf }, []);
+    incremental.updateVisibility(store, moved);
+    full.updateVisibility(store);
+    const visible = (p: Presenter) => Array.from({ length: 50 }, (_, m) => p.isVisible(m));
+    expect(visible(incremental)).toEqual(visible(full));
+    expect(incremental.visibleCount).toBe(full.visibleCount);
+  });
+
   describe('gliding', () => {
     it('glides only the selected friend below street zoom, where pins may be clustered', () => {
       const store = storeWith(4, ...mover(1, 72, 5), ...mover(2, 72.001, 5));
@@ -112,6 +140,16 @@ describe('Presenter', () => {
       p.updateVisibility(store);
       p.updateGliding(store, 1);
       expect(p.isGliding(1)).toBe(false);
+    });
+
+    it('keeps a poorly located friend’s accuracy halo while it glides', () => {
+      const store = new LocationStore();
+      store.reset(2, Infinity);
+      store.ingest({ n: 1, buf: new Float64Array([1, 1, 72, 19, 0, 90]) }, []);
+      const p = presenterAt(view(14));
+      p.updateVisibility(store);
+      p.updateGliding(store, 1);
+      expect(p.motionFrame(store).buf[4]).toBe(90);
     });
 
     it('reports whether the gliding set changed', () => {

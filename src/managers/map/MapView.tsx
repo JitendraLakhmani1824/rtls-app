@@ -6,7 +6,6 @@ import {
   type CameraRef,
   type GeoJSONSourceProps,
   type GeoJSONSourceRef,
-  type StyleSpecification,
   type ViewStateChangeEvent,
 } from '@maplibre/maplibre-react-native';
 import {
@@ -26,15 +25,16 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
-import positron from '../../../assets/map-style/positron.json';
+import { MOTION_STRIDE } from '@core/models';
+
 import { EMPTY_FC } from './encode';
 import type { MapViewModel, MemberTable, TrailTip } from './viewModel';
 
-const MAP_STYLE = positron as unknown as StyleSpecification;
 const FONT = ['Noto Sans Bold']; // the only glyphs OpenFreeMap serves
 const CLUSTER_MAX_ZOOM = 15;
 
 type PressEvent = Parameters<NonNullable<GeoJSONSourceProps['onPress']>>[0];
+const ignore = () => {}; // feature-state calls fail harmlessly before the source is on the map
 
 /** A map component bound to one model. Screens receive it as `MapView` and never see MapLibre. */
 export function createMapView(model: MapViewModel): ComponentType {
@@ -64,7 +64,7 @@ function MapLibreView({ model }: { model: MapViewModel }) {
   return (
     <MapLibreMap
       style={StyleSheet.absoluteFill}
-      mapStyle={MAP_STYLE}
+      mapStyle={model.mapStyle}
       logo={false}
       preferredFramesPerSecond={fps}
       onDidFinishLoadingStyle={() => model.handleReady(true)}
@@ -110,7 +110,21 @@ function StillPins({
   cameraRef: RefObject<CameraRef | null>;
 }) {
   const data = useSyncExternalStore(model.stillData.subscribe, model.stillData.get);
+  const selected = useSyncExternalStore(model.selection.subscribe, model.selection.get);
   const sourceRef = useRef<GeoJSONSourceRef>(null);
+  const ringed = useRef<number | null>(null);
+
+  // Selection ring by feature state: paint only, the pins' data is not re-sent. Re-applied when the
+  // data changes so it survives a style reload; the call is cheap.
+  useEffect(() => {
+    const source = sourceRef.current;
+    if (!source) return;
+    const prev = ringed.current;
+    if (prev !== null && prev !== selected) source.removeFeatureState({ id: prev }).catch(ignore);
+    if (selected !== null)
+      source.setFeatureState({ id: selected }, { selected: true }).catch(ignore);
+    ringed.current = selected;
+  }, [selected, data]);
 
   const onPress = useCallback(
     async (e: PressEvent) => {
@@ -165,6 +179,28 @@ function StillPins({
         paint={{ 'text-color': '#ffffff' }}
       />
       <Layer
+        id="still-halos"
+        type="circle"
+        filter={['all', ['!', ['has', 'point_count']], ['has', 'h']]}
+        paint={{
+          // h = radius in points at zoom 0; doubling per zoom level keeps it true to metres.
+          'circle-radius': [
+            'interpolate',
+            ['exponential', 2],
+            ['zoom'],
+            0,
+            ['get', 'h'],
+            24,
+            ['*', ['get', 'h'], 2 ** 24],
+          ],
+          'circle-color': ['get', 'c'],
+          'circle-opacity': 0.12,
+          'circle-stroke-color': ['get', 'c'],
+          'circle-stroke-width': 1,
+          'circle-stroke-opacity': 0.4,
+        }}
+      />
+      <Layer
         id="still-pins"
         type="circle"
         filter={['!', ['has', 'point_count']]}
@@ -173,7 +209,12 @@ function StillPins({
           'circle-radius': 9,
           'circle-opacity': ['match', ['get', 'p'], 1, 0.7, 2, 0.4, 1],
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': ['case', ['==', ['get', 's'], 1], 4, 1.5],
+          'circle-stroke-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            4,
+            1.5,
+          ],
         }}
       />
       <Layer
@@ -203,7 +244,7 @@ const ForwardedSource = forwardRef<GeoJSONSourceRef, GeoJSONSourceProps>(
 ) as unknown as ComponentType<GeoJSONSourceProps>;
 const AnimatedSource = Animated.createAnimatedComponent(ForwardedSource);
 
-/** member → [fromLng, fromLat, toLng, toLat, startMs, endMs] on the UI-thread clock. */
+/** member → [fromLng, fromLat, toLng, toLat, startMs, endMs, haloPoints] on the UI-thread clock. */
 type Glides = Record<string, number[]>;
 
 function GlidingPins({ model }: { model: MapViewModel }) {
@@ -273,6 +314,27 @@ function GlidingPins({ model }: { model: MapViewModel }) {
         animatedProps={animatedProps}
       >
         <Layer
+          id="moving-halos"
+          type="circle"
+          filter={['has', 'h']}
+          paint={{
+            'circle-radius': [
+              'interpolate',
+              ['exponential', 2],
+              ['zoom'],
+              0,
+              ['get', 'h'],
+              24,
+              ['*', ['get', 'h'], 2 ** 24],
+            ],
+            'circle-color': ['get', 'c'],
+            'circle-opacity': 0.12,
+            'circle-stroke-color': ['get', 'c'],
+            'circle-stroke-width': 1,
+            'circle-stroke-opacity': 0.4,
+          }}
+        />
+        <Layer
           id="moving-pins"
           type="circle"
           paint={{
@@ -314,13 +376,15 @@ function progress(g: number[], now: number): number {
 function retarget(prev: Glides, entries: number[], now: number): Glides {
   'worklet';
   const next: Glides = {};
-  for (let i = 0; i + 3 < entries.length; i += 4) {
+  for (let i = 0; i + MOTION_STRIDE <= entries.length; i += MOTION_STRIDE) {
     const m = entries[i] as number;
     const lng = entries[i + 1] as number;
     const lat = entries[i + 2] as number;
     const duration = entries[i + 3] as number;
+    const halo = entries[i + 4] as number;
     const cur = prev[m];
     if (cur && cur[2] === lng && cur[3] === lat) {
+      cur[6] = halo;
       next[m] = cur;
       continue;
     }
@@ -331,7 +395,7 @@ function retarget(prev: Glides, entries: number[], now: number): Glides {
       fromLng = (cur[0] as number) + ((cur[2] as number) - (cur[0] as number)) * k;
       fromLat = (cur[1] as number) + ((cur[3] as number) - (cur[1] as number)) * k;
     }
-    next[m] = [fromLng, fromLat, lng, lat, now, now + duration];
+    next[m] = [fromLng, fromLat, lng, lat, now, now + duration, halo];
   }
   return next;
 }
@@ -355,6 +419,7 @@ function encodeGliding(
     const lng = (g[0] as number) + ((g[2] as number) - (g[0] as number)) * k;
     const lat = (g[1] as number) + ((g[3] as number) - (g[1] as number)) * k;
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+    const halo = (g[6] as number) > 0 ? ',"h":' + (g[6] as number).toFixed(9) : '';
     if (!first) s += ',';
     first = false;
     s +=
@@ -368,6 +433,7 @@ function encodeGliding(
       (table.initials[m] ?? '') +
       '","s":' +
       (m === selected ? 1 : 0) +
+      halo +
       '},"geometry":{"type":"Point","coordinates":[' +
       lng.toFixed(6) +
       ',' +

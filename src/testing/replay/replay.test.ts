@@ -74,9 +74,9 @@ function fnv1a(text: string): string {
 
 describe('replay fingerprint (seed 42, 60 s, all faults on)', () => {
   it.each([
-    ['concert', { still: 63, moving: 170, trails: 11, hash: 'a558854c' }],
-    ['marathon', { still: 64, moving: 286, trails: 32, hash: 'ed8589ca' }],
-    ['trip', { still: 54, moving: 263, trails: 62, hash: 'deff0d5f' }],
+    ['concert', { still: 63, moving: 174, trails: 10, hash: '887c8778' }],
+    ['marathon', { still: 64, moving: 287, trails: 29, hash: '18690f8f' }],
+    ['trip', { still: 59, moving: 245, trails: 61, hash: '50895743' }],
   ] as const)('%s sends the same frames to the map as before', (scenario, expected) => {
     expect(replay(scenario)).toEqual(expected);
   });

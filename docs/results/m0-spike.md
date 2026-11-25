@@ -46,6 +46,8 @@ Map frames are read from Android's compositor (`dumpsys SurfaceFlinger --latency
 - **Path C is the only one that reaches the full 30 updates/s with zero JavaScript time.** The UI thread holds 60 fps.
 - **Path B costs ~4 ms of JS per update** (~10% of the JS budget at 24 updates/s) and nudges JS to 58–59 fps.
 - **Path A is simplest,** and React's commit latency (~5–6 ms) is fine for low-frequency sources.
+> **Correction (M3):** "42 frames/s" was a ceiling of the capture, not the frame rate. SurfaceFlinger keeps only the last 127 frames, and 127 ÷ 3 s = 42.3. The true rate was at least that. The gap figures are real but cover only the last ~2 s. Since M3 the script samples in 1-second chunks; corrected numbers are in `m3-map.md`.
+
 - **`onDidFinishRenderingFrame` under-counts on Android too:** 23–31/s against the 42/s SurfaceFlinger saw.
 
 ### Sheet check (Android)
@@ -54,7 +56,7 @@ Map frames are read from Android's compositor (`dumpsys SurfaceFlinger --latency
 | --- | --- |
 | Opens as a native bottom sheet; map undimmed (`sheetLargestUndimmedDetentIndex: 'last'`) | ✅ |
 | Map touchable with the sheet open (swipe pans the map) | ✅ — the dimming trap does not apply with this setting |
-| Map keeps drawing under the sheet | ✅ 42 frames/s, gaps ≤ 33.4 ms, 30 updates/s |
+| Map keeps drawing under the sheet | ✅ ≥ 42 frames/s (see correction), gaps ≤ 33.4 ms, 30 updates/s |
 | App state / Home focus with the sheet open | `active` / **`false`** (same as iOS) |
 | Close → selection cleared → sheet dismissed → Home focused | ✅ |
 | Android back button → same as Close | ✅ |

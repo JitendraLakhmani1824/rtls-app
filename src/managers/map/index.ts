@@ -1,1 +1,1 @@
-export { MapLibreManager } from './MapLibreManager';
+export { MapLibreManager, type MapOptions } from './MapLibreManager';

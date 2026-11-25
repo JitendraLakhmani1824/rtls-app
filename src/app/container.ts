@@ -34,8 +34,11 @@ export function createContainer(params: LaunchParams): Container {
     device.clock,
   );
   const feed = withFaults(synthetic, params.faults, params.seed);
-  const map = new MapLibreManager({ center: VENUE, zoom: scenario.zoom });
   const recorder = params.perf ? new PerfRecorder(`rung ${params.rung} ${params.scenario}`) : null;
+  const map = new MapLibreManager(
+    { center: VENUE, zoom: scenario.zoom, symbolFadeMs: params.fadeMs },
+    recorder ?? noopPerf,
+  );
   const session = new LiveSession({
     feed,
     map,

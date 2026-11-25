@@ -8,7 +8,8 @@ import {
   type TrailFrame,
   type Viewport,
 } from '../models';
-import { HEARTBEAT_MS, presenceOf } from './presence';
+import { metersPerPoint } from '../utils';
+import { MOVING_MS, PAUSED_PRESENCE } from './presence';
 import type { LocationStore } from './store';
 import type { TrailStore } from './trails';
 
@@ -24,14 +25,6 @@ const ENTER_PAD = 1.5;
 const LEAVE_PAD = 1.8;
 const MIN_GLIDE_MS = 500;
 const MAX_GLIDE_MS = 5000;
-const MOVING_MS = 0.5;
-const PAUSED_CODE = 3;
-const RAD = Math.PI / 180;
-
-/** Metres per screen point at a zoom and latitude (MapLibre: 512-point tiles). */
-export function metersPerPoint(zoom: number, lat: number): number {
-  return (40_075_016.686 * Math.cos(lat * RAD)) / (512 * 2 ** zoom);
-}
 
 /**
  * Decides what the map draws: who is on screen, who glides (every frame) and who stays still
@@ -42,6 +35,14 @@ export class Presenter {
   private budget: Budget = { glideLimit: 30, glideFps: 60, gestureUpdatesPerSec: 4 };
   private visible = new Uint8Array(0);
   private visibleN = 0;
+  private glidingFlag = new Uint8Array(0); // mirrors `gliding`, for the per-member loops
+  // The viewport's centre and padded half-sizes, for entering and for leaving the screen.
+  private cx = 0;
+  private cy = 0;
+  private enterW = Infinity;
+  private enterH = Infinity;
+  private leaveW = Infinity;
+  private leaveH = Infinity;
   private lastPresence = new Uint8Array(0);
   private gliding = new Set<number>();
   private next = new Set<number>();
@@ -53,6 +54,7 @@ export class Presenter {
   reset(memberCount: number) {
     this.visible = new Uint8Array(memberCount);
     this.visibleN = 0;
+    this.glidingFlag = new Uint8Array(memberCount);
     this.lastPresence = new Uint8Array(memberCount).fill(255);
     this.gliding.clear();
   }
@@ -63,6 +65,14 @@ export class Presenter {
 
   setViewport(viewport: Viewport | null) {
     this.viewport = viewport;
+    const halfW = viewport ? (viewport.east - viewport.west) / 2 : Infinity;
+    const halfH = viewport ? (viewport.north - viewport.south) / 2 : Infinity;
+    this.cx = viewport ? (viewport.east + viewport.west) / 2 : 0;
+    this.cy = viewport ? (viewport.north + viewport.south) / 2 : 0;
+    this.enterW = halfW * ENTER_PAD;
+    this.enterH = halfH * ENTER_PAD;
+    this.leaveW = halfW * LEAVE_PAD;
+    this.leaveH = halfH * LEAVE_PAD;
   }
 
   get visibleCount() {
@@ -72,33 +82,37 @@ export class Presenter {
     return this.visible[m] === 1;
   }
   isGliding(m: number) {
-    return this.gliding.has(m);
+    return this.glidingFlag[m] === 1;
   }
 
-  /** Who is on screen: inside the viewport padded 1.5×; already-visible members leave only past 1.8×. */
-  updateVisibility(store: LocationStore): boolean {
-    const v = this.viewport;
-    let changed = false;
-    let count = 0;
-    for (let m = 0; m < store.size; m++) {
-      let on = store.has(m);
-      if (on && v) {
-        const pad = this.visible[m] === 1 ? LEAVE_PAD : ENTER_PAD;
-        const hw = ((v.east - v.west) / 2) * pad;
-        const hh = ((v.north - v.south) / 2) * pad;
-        on =
-          Math.abs(store.lng(m) - (v.east + v.west) / 2) <= hw &&
-          Math.abs(store.lat(m) - (v.north + v.south) / 2) <= hh;
-      }
-      const flag = on ? 1 : 0;
-      if (this.visible[m] !== flag) {
-        this.visible[m] = flag;
-        changed = true;
-      }
-      count += flag;
+  /**
+   * Who is on screen: inside the viewport padded 1.5×; already-visible members leave only past 1.8×.
+   * Pass `changed` (members whose position changed) to check only them; omit it after a viewport
+   * change or a reset. Returns true if anyone appeared or disappeared.
+   */
+  updateVisibility(store: LocationStore, changed?: readonly number[]): boolean {
+    let any = false;
+    if (changed) {
+      for (const m of changed) if (this.check(store, m)) any = true;
+    } else {
+      for (let m = 0; m < store.size; m++) if (this.check(store, m)) any = true;
     }
-    this.visibleN = count;
-    return changed;
+    return any;
+  }
+
+  private check(store: LocationStore, m: number): boolean {
+    let on = store.has(m);
+    if (on && this.viewport) {
+      const was = this.visible[m] === 1;
+      on =
+        Math.abs(store.lng(m) - this.cx) <= (was ? this.leaveW : this.enterW) &&
+        Math.abs(store.lat(m) - this.cy) <= (was ? this.leaveH : this.enterH);
+    }
+    const flag = on ? 1 : 0;
+    if (this.visible[m] === flag) return false;
+    this.visible[m] = flag;
+    this.visibleN += on ? 1 : -1;
+    return true;
   }
 
   /**
@@ -118,7 +132,7 @@ export class Presenter {
       for (let m = 0; m < store.size; m++) {
         if (m === selected || this.visible[m] !== 1 || store.paused(m)) continue;
         if (store.speed(m) < MOVING_MS) continue;
-        const minPxPerS = this.gliding.has(m) ? KEEP_GLIDE_PX_PER_S : MIN_GLIDE_PX_PER_S;
+        const minPxPerS = this.glidingFlag[m] === 1 ? KEEP_GLIDE_PX_PER_S : MIN_GLIDE_PX_PER_S;
         if (store.speed(m) / metersPerPoint(zoom, store.lat(m)) >= minPxPerS) c.push(m);
       }
       c.sort((a, b) => store.speed(b) - store.speed(a));
@@ -128,11 +142,15 @@ export class Presenter {
 
     let changed = this.next.size !== this.gliding.size;
     if (!changed) for (const m of this.next) if (!this.gliding.has(m)) changed = true;
-    if (changed) [this.gliding, this.next] = [this.next, this.gliding];
+    if (changed) {
+      for (const m of this.gliding) this.glidingFlag[m] = 0;
+      for (const m of this.next) this.glidingFlag[m] = 1;
+      [this.gliding, this.next] = [this.next, this.gliding];
+    }
     return changed;
   }
 
-  /** The whole gliding set: latest position, glided over the last fix interval (0 = snap after a jump). */
+  /** The whole gliding set: latest position, glided over the last fix interval (0 = snap after a jump), halo. */
   motionFrame(store: LocationStore): MotionFrame {
     const f = this.motion;
     const size = Math.max(1, this.gliding.size) * MOTION_STRIDE;
@@ -148,23 +166,27 @@ export class Presenter {
         store.snapped(m) || Number.isNaN(interval)
           ? 0
           : Math.min(MAX_GLIDE_MS, Math.max(MIN_GLIDE_MS, interval));
+      f.buf[o + 4] = store.halo(m);
       f.n++;
     }
     return f;
   }
 
-  /** Every on-screen member that isn't gliding or paused, with its presence (sources are replace-all). */
+  /** Every on-screen member that isn't gliding or paused, with presence and halo (sources are replace-all). */
   stillFrame(store: LocationStore, now: number): PinFrame {
     const f = this.still;
     if (f.buf.length < store.size * PIN_STRIDE) f.buf = new Float64Array(store.size * PIN_STRIDE);
     f.n = 0;
     for (let m = 0; m < store.size; m++) {
-      if (this.visible[m] !== 1 || this.gliding.has(m) || store.paused(m)) continue;
+      if (this.visible[m] !== 1 || this.glidingFlag[m] === 1) continue;
+      const presence = store.presence(m, now);
+      if (presence === PAUSED_PRESENCE) continue;
       const o = f.n * PIN_STRIDE;
       f.buf[o] = m;
       f.buf[o + 1] = store.lng(m);
       f.buf[o + 2] = store.lat(m);
-      f.buf[o + 3] = presenceOf(now, store.heardAt(m), expectedInterval(store, m));
+      f.buf[o + 3] = presence;
+      f.buf[o + 4] = store.halo(m);
       f.n++;
     }
     return f;
@@ -175,9 +197,7 @@ export class Presenter {
     let changed = false;
     for (let m = 0; m < store.size; m++) {
       if (!store.has(m)) continue;
-      const code = store.paused(m)
-        ? PAUSED_CODE
-        : presenceOf(now, store.heardAt(m), expectedInterval(store, m));
+      const code = store.presence(m, now);
       if (this.lastPresence[m] !== code) {
         this.lastPresence[m] = code;
         changed = true;
@@ -217,11 +237,6 @@ export class Presenter {
     }
     return b.end();
   }
-}
-
-function expectedInterval(store: LocationStore, m: number) {
-  const interval = store.interval(m);
-  return store.speed(m) >= MOVING_MS && Number.isFinite(interval) ? interval : HEARTBEAT_MS;
 }
 
 /** Builds a TrailFrame in reused, growing buffers; drops parts with fewer than two points. */

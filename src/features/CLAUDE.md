@@ -5,6 +5,7 @@ Each feature is a folder: `XScreen.tsx` (thin wiring) + `useX.ts` (data + action
 **What a screen may see:** `useManagers()` → `{ session, MapView }`, plus the hooks `useSelected()`, `useConnection()` (and `useRows()` from M5). Nothing from `managers/`, `core/engine` or `core/sharing`.
 
 **Rules**
+
 - Location data never enters React state: screens read the session's snapshot hooks, which change at most once a second.
 - Features never import each other; navigate by route name (`common/navigation/routes.ts`).
 - Selection lives only in the session. The Detail sheet (M5) opens when `selected` becomes non-null; dismissing it calls `session.select(null)`.

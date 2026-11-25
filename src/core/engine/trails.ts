@@ -1,10 +1,9 @@
 import type { SessionProfile } from '../models';
 import { distanceMeters } from '../utils';
+import { POOR_ACCURACY_M } from './store';
 
 /** Points on a trail: lng, lat, tMs. A NaN lng marks a break (after a jump). */
 const P = 3;
-/** Above this accuracy (m) a fix doesn't extend the trail. */
-export const MAX_TRAIL_ACCURACY_M = 50;
 /** A gap longer than this breaks the line instead of joining it straight. */
 export const TRAIL_GAP_MS = 120_000;
 
@@ -52,7 +51,7 @@ export class TrailStore {
     breakBefore: boolean,
   ): boolean {
     const profile = this.profile;
-    if (!profile || !(accuracyM <= MAX_TRAIL_ACCURACY_M)) return false;
+    if (!profile || !(accuracyM <= POOR_ACCURACY_M)) return false;
     const last = this.lastIndex(m);
     if (last >= 0 && !breakBefore) {
       const lastLng = this.at(m, last, 0);

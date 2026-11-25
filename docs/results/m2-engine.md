@@ -15,11 +15,13 @@
 
 | Run | Map frames | Gap p50 · p95 · max | JS fps | Engine cost |
 | --- | --- | --- | --- | --- |
-| Marathon 200, street zoom, runners gliding, one selected with its trail | **42/s** | 16.7 · 33.4 · **33.5 ms** | 58–60 | per batch: ingest 0.7–2.2 ms, motion frame 0.2–0.4 ms · per second: who glides 1–3.6 ms, trail frame 0.6–1.1 ms |
+| Marathon 200, street zoom, runners gliding, one selected with its trail | **≥ 42/s** | 16.7 · 33.4 · **33.5 ms** | 58–60 | per batch: ingest 0.7–2.2 ms, motion frame 0.2–0.4 ms · per second: who glides 1–3.6 ms, trail frame 0.6–1.1 ms |
 | Concert 200, overview | 24/s | 16.7 · 33.4 · 702 ms | 59–60 | ingest 0.16–0.34 ms · still frame 1.2–3.3 ms (1/s) |
 | Marathon 200, overview | 30/s | 16.7 · 33.4 · 686 ms | 59–60 | ingest 1.1–1.2 ms |
 | Trip 200, overview | 25/s | 16.7 · 33.5 · 686 ms | 60 | ingest 0.85–0.9 ms |
 | Concert 500, all faults on | 25/s | 16.7 · 33.4 · 702 ms | 58 | visibility 1.7–3.1 ms per batch · still frame 2.8 ms (1/s) · no errors |
+
+> **Correction (M3):** "42 frames/s" was a ceiling of the capture, not the frame rate. SurfaceFlinger keeps only the last 127 frames, and 127 ÷ 3 s = 42.3. The true rate was at least that. The gap figures are real but cover only the last ~2 s. Since M3 the script samples in 1-second chunks; corrected numbers are in `m3-map.md`.
 
 **Reading:** while pins glide, the map never misses more than one refresh (longest gap 33.5 ms) — the same as M1, now with trails and the trail tip. In the overview nothing glides, so MapLibre draws only when still pins change: the long gaps are idle time, not stalls.
 
@@ -42,7 +44,7 @@ All three scenarios, no errors. JS 60 fps; ingest 0.03–0.2 ms, trail frame 0.1
 ## Open
 
 - Visibility rescans everyone on each batch (1.7–3 ms at 500 friends): make it incremental.
-- The overview still draws ~25 map frames/s with nothing gliding: check symbol fades and cluster updates in M5 (battery).
+- The overview still draws ~25 map frames/s with nothing gliding: check symbol fades and cluster updates (done in M3: `m3-ladder.md`).
 - Session contract test arrives with the fake session in M3.
 - `jsFps` read ~50,000 once on the iOS simulator right after a fresh dev-client load; not seen again.
 - Real-iPhone run still pending.

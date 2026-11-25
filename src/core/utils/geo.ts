@@ -1,5 +1,11 @@
 const EARTH_RADIUS_M = 6_371_000;
 const RAD = Math.PI / 180;
+const EQUATOR_M = 40_075_016.686;
+
+/** Metres per screen point at a zoom and latitude (MapLibre: 512-point tiles). */
+export function metersPerPoint(zoom: number, lat: number): number {
+  return (EQUATOR_M * Math.cos(lat * RAD)) / (512 * 2 ** zoom);
+}
 
 /** Great-circle distance in metres. */
 export function distanceMeters(lng1: number, lat1: number, lng2: number, lat2: number): number {

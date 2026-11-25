@@ -65,7 +65,7 @@ describe('LiveSession', () => {
       map.members = [];
       map.setReady(true);
       expect(map.members).toHaveLength(2);
-      expect(map.lastStill).toEqual([[1, 72, 19, Presence.Live]]);
+      expect(map.lastStill).toEqual([[1, 72, 19, Presence.Live, 0]]);
       expect(map.frameRateCaps.at(-1)).toBe(60);
     });
 
@@ -88,14 +88,14 @@ describe('LiveSession', () => {
       feed.fixes([1, 1, 72, 19, t0], [2, 1, 72.001, 19, t0]);
       device.clock.advance(1000);
       expect(map.lastStill).toEqual([
-        [1, 72, 19, Presence.Live],
-        [2, 72.001, 19, Presence.Live],
+        [1, 72, 19, Presence.Live, 0],
+        [2, 72.001, 19, Presence.Live, 0],
       ]);
       feed.fixes([1, 2, 72, 19 + 3 * M, t0 + 1000]); // friend 1 walks 3 m in 1 s
       device.clock.advance(1000);
       // On the same tick, friend 1 starts gliding and leaves the still pins: never drawn twice
-      expect(map.lastMoving).toEqual([[1, 72, 19 + 3 * M, 1000]]);
-      expect(map.lastStill).toEqual([[2, 72.001, 19, Presence.Live]]);
+      expect(map.lastMoving).toEqual([[1, 72, 19 + 3 * M, 1000, 0]]);
+      expect(map.lastStill).toEqual([[2, 72.001, 19, Presence.Live, 0]]);
     });
 
     it('does not resend still pins when nothing changed', () => {
@@ -116,7 +116,7 @@ describe('LiveSession', () => {
       device.clock.advance(1000);
       feed.fixes([1, 1, 72, 19, t0], [1, 2, 72, 19 + 2 * M, t0 + 1000]);
       device.clock.advance(1000);
-      expect(map.stillFrames).toEqual([[[1, 72, 19 + 2 * M, Presence.Live]]]);
+      expect(map.stillFrames).toEqual([[[1, 72, 19 + 2 * M, Presence.Live, 0]]]);
     });
 
     it('snaps instead of gliding across the map after a confirmed jump', () => {
@@ -129,7 +129,7 @@ describe('LiveSession', () => {
       feed.fixes([1, 2, 72, 19.005, t0 + 1000, 5]); // 550 m in 1 s: held
       expect(map.lastMoving?.[0]?.[2]).toBe(19);
       feed.fixes([1, 3, 72, 19.005 + M, t0 + 2000, 5]); // confirmed
-      expect(map.lastMoving).toEqual([[1, 72, 19.005 + M, 0]]);
+      expect(map.lastMoving).toEqual([[1, 72, 19.005 + M, 0, 0]]);
     });
   });
 
@@ -203,7 +203,7 @@ describe('LiveSession', () => {
       map.pressPin(1);
       expect(session.selected.get()).toBe(1);
       expect(map.selected).toBe(1);
-      expect(map.lastMoving).toEqual([[1, 72, 19, 0]]); // the selected friend always glides
+      expect(map.lastMoving).toEqual([[1, 72, 19, 0, 0]]); // the selected friend always glides
     });
   });
 
@@ -219,7 +219,7 @@ describe('LiveSession', () => {
       expect(map.frameRateCaps.at(-1)).toBe(0);
       expect(map.lastMoving).toEqual([]);
       device.clock.advance(1000);
-      expect(map.lastStill).toEqual([[1, 72, 19, Presence.Live]]); // drawn as a still pin instead
+      expect(map.lastStill).toEqual([[1, 72, 19, Presence.Live, 0]]); // drawn as a still pin instead
     });
 
     it('slows motion updates to the gesture rate while the user pans', () => {

@@ -12,12 +12,13 @@ description: Build and run the RTLS app on the iOS simulator or the USB-connecte
 | Param | Meaning | Default |
 | --- | --- | --- |
 | `name` | `concert` (event: most people standing), `marathon` (race: runners on a 5 km loop), `trip` (convoy of cars on a 24 km road) | concert |
-| `friends` | People in the session (1–5000) | 200 |
+| `friends` | People in the session (1–5000) | 10 |
 | `interval` | Ms between fixes for a moving friend | 1000 |
 | `seed` | Same seed → same crowd | 42 |
 | `faults` | Comma list of `drops` (10% lost), `dups` (5% twice), `reorder` (5% late), `jumps` (2% thrown 300 m) | none |
-| `rung` | `A` = one Marker per friend (comparison only), `D` = real engine | D |
+| `rung` | `A` = one Marker per friend, `B` = one source sent per batch, `C` = B + per-frame batching and on-screen only (A–C for comparison only), `D` = real engine | D |
 | `perf` | `1` prints a `PERF {json}` line every second | 1 in dev builds, 0 in release |
+| `fade` | Experiment: label fade-in after map updates, ms (MapLibre's default is 300) | 0 |
 
 Opening a new link rebuilds the app's pieces from scratch.
 
@@ -37,7 +38,7 @@ Opening a new link rebuilds the app's pieces from scratch.
 3. Screenshot: `adb exec-out screencap -p > shot.png` (resize with `sips -Z 900` before viewing).
 4. Taps: `adb shell input tap X Y` in physical pixels (1080×2412 on the OnePlus 10T).
 5. PERF lines: `adb logcat -d -s ReactNativeJS:V | grep PERF`.
-6. Real map frames: `scripts/map-frames-android.sh <label> 3` (SurfaceFlinger present times). Screen recording over adb is blocked on this phone.
+6. Real map frames: `scripts/map-frames-android.sh <label> 3` (SurfaceFlinger present times, sampled in 1 s chunks). Screen recording over adb is blocked on this phone.
 
 ## Report
 

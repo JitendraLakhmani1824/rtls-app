@@ -16,18 +16,22 @@ export type Member = {
 export type FixBatch = { n: number; buf: Float64Array };
 export const FIX_STRIDE = 6;
 
-/** Pins drawn still. Each pin is PIN_STRIDE numbers: member, lng, lat, presence. */
+/**
+ * Pins drawn still. Each pin is PIN_STRIDE numbers: member, lng, lat, presence, haloM —
+ * haloM is the accuracy radius to draw around a poorly located pin, 0 for none.
+ */
 export type PinFrame = { n: number; buf: Float64Array };
-export const PIN_STRIDE = 4;
+export const PIN_STRIDE = 5;
 
 /**
- * Gliding pins. Each entry is MOTION_STRIDE numbers: member, lng, lat, durationMs —
- * "glide this member to (lng, lat) over durationMs, starting from wherever it is drawn now".
+ * Gliding pins. Each entry is MOTION_STRIDE numbers: member, lng, lat, durationMs, haloM —
+ * "glide this member to (lng, lat) over durationMs, starting from wherever it is drawn now";
+ * haloM as in PinFrame.
  * The frame lists the whole gliding set: members not in it are no longer drawn as gliding.
  * Durations, not timestamps, so the renderer can animate on its own clock (UI thread or native).
  */
 export type MotionFrame = { n: number; buf: Float64Array };
-export const MOTION_STRIDE = 4;
+export const MOTION_STRIDE = 5;
 
 /** Presence codes carried in PinFrame. Paused members are not drawn at all. */
 export const Presence = { Live: 0, Recent: 1, Stale: 2 } as const;

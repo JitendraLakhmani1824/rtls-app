@@ -14,18 +14,21 @@ The method is fixed so numbers are comparable between runs (plan §6, design §2
 - **`perf=1` in the link**; the on-screen overlay stays off (PERF lines come from `PerfRecorder`).
 - **Same seed** for every cell. Fixed screen brightness. Note the battery temperature at the start and end (`adb shell dumpsys battery | grep temperature`, tenths of °C).
 - **ABAB order, 3 runs per cell.** Report the median.
-- **Cold start every run:** `adb shell am force-stop com.rtls.casestudy`, then open the link. Wait 10 s to warm up, then measure 3 s.
+- **Cold start every run**, 15 s warm-up, 5 s measured. `scripts/ladder-android.sh` does all of this.
+- **Never edit a script while it runs:** bash reads it as it goes.
 
-## One cell
+## A ladder (one row of the matrix)
 
 ```bash
-adb shell am force-stop com.rtls.casestudy
-adb shell "am start -a android.intent.action.VIEW -d 'rtls://scenario?friends=200&seed=42&rung=D&perf=1'"
-sleep 10
-scripts/map-frames-android.sh D-200 3
+scripts/ladder-android.sh 200 3 concert
 ```
 
-Record map frames/s, gap p50/p95/max, and from the PERF lines: jsFps, fixes/s, ingest/plan/motionFrame/stillFrame ms.
+One JSON row per run, then the median per rung. `RUNGS="D"` limits the rungs; `EXTRA="&fade=300"` adds link parameters, for a before/after on one change.
+
+Each row has:
+- **Map surface** (SurfaceFlinger, sampled in 1 s chunks: the compositor keeps only 127 frames): frames/s, gap p50/p95 over active gaps, max gap, stutter % (active gaps > 25 ms), idle gaps (> 100 ms: nothing to draw).
+- **App UI** (`gfxinfo`): frames/s, janky %. Only rung A draws pins as app views.
+- **PERF:** jsFps, jsLagMs (JS busy beyond one frame), longTasks, gcs, and ms per call for ingest, visibility, stillFrame, encodeStill / encode.
 
 ## Matrix
 
@@ -35,7 +38,7 @@ Record map frames/s, gap p50/p95/max, and from the PERF lines: jsFps, fixes/s, i
 | D | 50, 500 | concert |
 | D | 200, 1,000 | marathon |
 
-Plus the energy step: glide at 30 vs 60 fps, rung D, 500 friends. Rungs B and C and the marathon scenario arrive in M3/M2; run what exists and mark the rest "not yet".
+Plus the energy step: glide at 30 vs 60 fps, rung D, 500 friends.
 
 ## Output
 

@@ -179,7 +179,9 @@ export class LiveSession implements Session {
       );
       if (added && this.presenter.drawsTrail(m, s, selected)) this.trailsDirty = true;
     }
-    if (perf.measure('visibility', () => this.presenter.updateVisibility(this.store))) {
+    if (
+      perf.measure('visibility', () => this.presenter.updateVisibility(this.store, this.changed))
+    ) {
       this.stillDirty = true;
       this.trailsDirty = true;
     }

@@ -32,6 +32,8 @@ const GPS_NOISE_PULL = 0.85;
 const OFFLINE_SHARE = 0.04;
 /** Some friends have paused sharing → hidden. */
 const PAUSED_SHARE = 0.02;
+/** Some friends are indoors: poor accuracy (60–120 m) → an accuracy halo, no trail. */
+const INDOOR_SHARE = 0.03;
 const PALETTE = [
   '#E4572E',
   '#17BEBB',
@@ -57,6 +59,7 @@ export class SyntheticFeedManager implements FeedManager {
   private readonly seq: Float64Array;
   private readonly silentFrom: Float64Array; // Infinity = never goes offline
   private readonly paused: Uint8Array;
+  private readonly indoorAccuracy: Float64Array; // 0 = outdoors
   private readonly noiseX: Float64Array;
   private readonly noiseY: Float64Array;
   private readonly fixes: FixBatch;
@@ -77,12 +80,15 @@ export class SyntheticFeedManager implements FeedManager {
     this.seq = new Float64Array(n);
     this.silentFrom = new Float64Array(n).fill(Infinity);
     this.paused = new Uint8Array(n);
+    this.indoorAccuracy = new Float64Array(n);
     this.noiseX = new Float64Array(n);
     this.noiseY = new Float64Array(n);
     for (let i = 1; i < n; i++) {
       const r = this.rng.next();
       if (r < OFFLINE_SHARE) this.silentFrom[i] = this.rng.range(30_000, 120_000);
       else if (r < OFFLINE_SHARE + PAUSED_SHARE) this.paused[i] = 1;
+      else if (r < OFFLINE_SHARE + PAUSED_SHARE + INDOOR_SHARE)
+        this.indoorAccuracy[i] = this.rng.range(60, 120);
     }
     this.fixes = { n: 0, buf: new Float64Array(n * FIX_STRIDE) };
     this.beats = { n: 0, buf: new Float64Array(n * PRESENCE_STRIDE) };
@@ -187,7 +193,8 @@ export class SyntheticFeedManager implements FeedManager {
     f.buf[o + 2] = lng;
     f.buf[o + 3] = lat;
     f.buf[o + 4] = now;
-    f.buf[o + 5] = this.rng.range(5, 15);
+    const indoor = this.indoorAccuracy[i] ?? 0;
+    f.buf[o + 5] = indoor > 0 ? indoor : this.rng.range(5, 15);
     f.n++;
   }
 

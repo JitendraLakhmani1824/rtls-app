@@ -371,9 +371,9 @@ type ServerHint = { watchers: number; nextIntervalMs: number; sessionEndsAt: num
 | `Member` | `{ id, key, name, initials, colour, isMe }` | `id` is a dense index 0…N−1 assigned once per session, so per-friend state is array-indexed. `isMe` marks the viewer (the scenario's "me" in the build) |
 | `FixBatch` | `{ n, buf: Float64Array }`, 6 per fix | `member, seq, lng, lat, tMs, accuracyM`; `seq` per member, assigned by the server |
 | `PresenceBatch` | `{ n, buf }`, 3 per entry | `member, lastHeardMs, paused (0/1)` |
-| `PinFrame` | `{ n, buf }`, 4 per pin | `member, lng, lat, presence` (0 live, 1 recent, 2 stale) |
-| `MotionFrame` | `{ n, buf }`, 4 per pin | `member, lng, lat, durationMs` — "glide to here over this long, from wherever the pin is drawn now". The frame lists the whole gliding set. Durations, not timestamps, so the renderer animates on its own clock (UI thread or native) |
-| `TrailFrame` | `{ n, offsets: Uint32Array, coords: Float64Array }` | Per member: points `lng, lat, ageBucket`; `offsets` mark where each member starts |
+| `PinFrame` | `{ n, buf }`, 5 per pin | `member, lng, lat, presence, haloM` — presence 0 live, 1 recent, 2 stale; `haloM` the accuracy radius for a poor fix (> 50 m), else 0 |
+| `MotionFrame` | `{ n, buf }`, 5 per pin | `member, lng, lat, durationMs, haloM` — "glide to here over this long, from wherever the pin is drawn now". The frame lists the whole gliding set. Durations, not timestamps, so the renderer animates on its own clock (UI thread or native) |
+| `TrailFrame` | `{ n, members, offsets: Uint32Array, coords: Float64Array }` | Parts of trails, split at jumps and gaps: `members[i]` owns part i; points `lng, lat, ageBucket`; `offsets` mark where each part starts |
 | `Viewport` | `{ west, south, east, north, zoom, gesturing }` | From map region events |
 | `ConnState` | `{ kind: 'live' \| 'reconnecting' \| 'offline', sinceMs }` | Owned by the feed |
 | `Cursor` | opaque | Last session-level batch sequence; resumes a feed without gaps |
@@ -494,8 +494,8 @@ stateDiagram-v2
 - **Layers:**
   - cluster circle + count;
   - pin circle in the member's colour, plus initials;
-  - accuracy halo;
-  - selection ring via feature state (paint only).
+  - accuracy halo for poor fixes (> 50 m), on still and gliding pins, true to metres at every zoom;
+  - selection ring: feature state on `pins-still` (paint only, no data re-sent); the `s` flag on `pins-moving`, which is re-encoded every frame anyway. The selected friend usually glides, so the feature-state ring shows when the budget stops gliding.
 
   Symbol layers set `icon-allow-overlap`, `icon-ignore-placement` and `text-allow-overlap`, so updates don't re-run label placement and fades.
 - **`frame(now)`:** interpolates every active segment into a reused buffer, encodes, updates `pins-moving` and `trail-tip`.
@@ -588,14 +588,14 @@ stateDiagram-v2
 
 ## 2.10 Performance results
 
-*Filled in at M3–M6. Release build, Android phone (model named), overlay off, ABAB order, 3 runs each.*
+*OnePlus 10T, release build, overview zoom. Details: `docs/results/m3-map.md`.*
 
 | Rung | What it is | 200 friends (concert) | 1,000 (concert) |
 | --- | --- | --- | --- |
-| A | One `Marker` per friend, friends in React state | — | — |
-| B | One source, updates applied as they arrive | — | — |
-| C | + per-frame batching, on-screen only | — | — |
-| D | + four sources, segments, speed budget | — | — |
+| A | One `Marker` per friend, friends in React state | App UI ~5 fps, 24–65% janky | — |
+| B | One source, updates applied as they arrive | Map 47–51 fps, p95 16.7 ms | — |
+| C | + per-frame batching, on-screen only | Same as B (didn't help) | — |
+| D | + four sources, segments, speed budget | Map 19 fps (2.5× fewer frames), p95 33.4 ms, 5–6% late | JS fixes made after the 1,000 run; not re-measured |
 
 Plus: rung D at 50 and 500 (concert) and at 200 and 1,000 (marathon); and an **energy step** — glide at 30 vs 60 fps, rung D, 500 friends.
 

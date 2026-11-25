@@ -7,7 +7,9 @@
 | Rung | What it is | JS fps | What draws the pins | Frames | Frame time |
 | --- | --- | --- | --- | --- | --- |
 | **A** | One MapLibre `Marker` (native view) per friend, positions in React state | 49 | App UI (`gfxinfo`) | **~4 fps** (12 in 3 s), **92% janky** | p50 65 ms · p95 73 ms |
-| **D** | Real engine: still pins ≤ 1×/s, gliding pins on the UI thread | 59–60 | MapLibre surface (SurfaceFlinger) | **42/s** | gap p50 16.7 ms · p95 33.4 ms · max 33.4 ms |
+| **D** | Real engine: still pins ≤ 1×/s, gliding pins on the UI thread | 59–60 | MapLibre surface (SurfaceFlinger) | **≥ 42/s** | gap p50 16.7 ms · p95 33.4 ms · max 33.4 ms |
+
+> **Correction (M3):** "42 frames/s" was a ceiling of the capture, not the frame rate. SurfaceFlinger keeps only the last 127 frames, and 127 ÷ 3 s = 42.3. The true rate was at least that. The gap figures are real but cover only the last ~2 s. Since M3 the script samples in 1-second chunks; corrected numbers are in `m3-map.md`.
 
 Engine cost per batch on the phone (rung D, from PERF lines): ingest 0.17–0.30 ms · glide planning 0.95–1.6 ms · motion frame 0.2–0.45 ms · still frame 0.8–1.3 ms (once a second).
 

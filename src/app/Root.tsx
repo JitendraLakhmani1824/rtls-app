@@ -1,5 +1,5 @@
 import { ManagersProvider } from '@common/di';
-import { RungAScreen } from '@lab/ladder';
+import { RungAScreen, RungBCScreen } from '@lab/ladder';
 import { NavigationContainer } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,6 +16,19 @@ export function Root() {
     return (
       <RungAScreen
         key={paramsKey(params)}
+        scenario={params.scenario}
+        friends={params.friends}
+        seed={params.seed}
+        intervalMs={params.intervalMs}
+        center={VENUE}
+      />
+    );
+  }
+  if (params.rung === 'B' || params.rung === 'C') {
+    return (
+      <RungBCScreen
+        key={paramsKey(params)}
+        rung={params.rung}
         scenario={params.scenario}
         friends={params.friends}
         seed={params.seed}
