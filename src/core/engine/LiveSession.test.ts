@@ -306,4 +306,46 @@ describe('LiveSession', () => {
       expect(map.fits).toHaveLength(2);
     });
   });
+
+  it('stops everything and tells the app when the user leaves', () => {
+    const device = new FakeDeviceManager();
+    const feed = new FakeFeedManager();
+    const map = new FakeMapManager();
+    let left = 0;
+    const session = new LiveSession({
+      feed,
+      map,
+      device,
+      perf: noopPerf,
+      profile: PROFILES.event,
+      onLeave: () => left++,
+    });
+    session.start();
+    session.leave();
+    expect(feed.running).toBe(false);
+    expect(device.clock.pendingTimers).toBe(0);
+    expect(left).toBe(1);
+  });
+
+  describe('tracking a friend', () => {
+    it('zooms in on the selected friend and follows them until the user pans', () => {
+      const { device, feed, map, session, t0 } = setup();
+      map.viewport.set(view(14));
+      session.start();
+      feed.members(fakeMembers(2));
+      feed.fixes([1, 1, 72, 19, t0]);
+      device.clock.advance(1000);
+      session.select(1);
+      expect(map.centers.at(-1)).toEqual([72, 19, 16]);
+      map.viewport.set({ ...view(16), west: 71.995, east: 72.005, south: 18.995, north: 19.005 });
+      device.clock.advance(1000);
+      feed.fixes([1, 2, 72, 19.003, t0 + 600_000]); // moved ~330 m: well past 15% of the view
+      device.clock.advance(1000);
+      expect(map.centers.at(-1)).toEqual([72, 19.003]);
+      map.viewport.set({ ...view(16), gesturing: true }); // the user pans
+      feed.fixes([1, 3, 72, 19.006, t0 + 1_200_000]);
+      device.clock.advance(1000);
+      expect(map.centers.at(-1)).toEqual([72, 19.003]);
+    });
+  });
 });

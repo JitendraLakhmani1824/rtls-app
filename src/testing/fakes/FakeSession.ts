@@ -10,6 +10,9 @@ export class FakeSession implements Session {
   readonly rows = createStore<FriendRow[]>([]);
   readonly calls: string[] = [];
 
+  leave() {
+    this.calls.push('leave');
+  }
   select(member: number | null) {
     this.calls.push(`select ${member}`);
     this.selected.set(member);

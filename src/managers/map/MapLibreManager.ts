@@ -28,6 +28,8 @@ export type MapOptions = {
   zoom: number;
   /** Label fade-in after a source update, ms. Default 0: a fade keeps the map redrawing. */
   symbolFadeMs?: number;
+  /** Group overlapping pins. For large sessions; a small group always shows every friend. Default on. */
+  groupPins?: boolean;
 };
 
 /**
@@ -62,12 +64,14 @@ export class MapLibreManager implements MapManager, MapViewModel {
 
   readonly initialView: { center: [number, number]; zoom: number };
   readonly mapStyle: StyleSpecification;
+  readonly groupPins: boolean;
 
   constructor(
     options: MapOptions,
     private readonly perf: Perf = noopPerf,
   ) {
     this.initialView = { center: options.center, zoom: options.zoom };
+    this.groupPins = options.groupPins ?? true;
     this.mapStyle = {
       ...(positron as unknown as StyleSpecification),
       // MapLibre fades labels in over the style's transition (300 ms by default) and keeps redrawing
@@ -135,9 +139,9 @@ export class MapLibreManager implements MapManager, MapViewModel {
     this.cameraCommand.set({ seq, kind: 'fit', bounds: [west, south, east, north] });
   }
 
-  centerOn(lng: number, lat: number) {
+  centerOn(lng: number, lat: number, zoom?: number) {
     const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
-    this.cameraCommand.set({ seq, kind: 'center', center: [lng, lat] });
+    this.cameraCommand.set({ seq, kind: 'center', center: [lng, lat], zoom });
   }
 
   setSelected(member: number | null) {

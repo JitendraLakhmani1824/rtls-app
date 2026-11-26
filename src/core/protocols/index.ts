@@ -92,8 +92,11 @@ export interface MapManager {
   setSelected(member: number | null): void;
   /** Animates the camera to show these bounds (degrees), leaving room for the app's controls. */
   fitTo(west: number, south: number, east: number, north: number): void;
-  /** Animates the camera to centre on a point, in the part of the map not covered by the app's controls. */
-  centerOn(lng: number, lat: number): void;
+  /**
+   * Animates the camera to centre on a point, in the part of the map not covered by the app's
+   * controls; zooms to `zoom` if given.
+   */
+  centerOn(lng: number, lat: number, zoom?: number): void;
   /** Most gliding updates per second the map should draw; 0 = no gliding. */
   setFrameRateCap(fps: number): void;
   onPinPress(listener: (member: number) => void): Stop;
@@ -105,6 +108,8 @@ export interface Session {
   /** What this session is, for the screen title, e.g. "Concert at BKC". */
   readonly title: string;
   select(member: number | null): void;
+  /** Leaves the session: the app stops it and returns to the start page. */
+  leave(): void;
   selected: Readable<number | null>;
   connection: Readable<ConnState>;
   /**

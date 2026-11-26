@@ -13,4 +13,4 @@ Each feature is a folder: `XScreen.tsx` (thin wiring) + `useX.ts` (data + action
 
 **Tests:** `useX` with `renderHook` (async in RNTL 14: `await renderHook`, `await act`), `createTestManagers()` from `@testing/fakes`, and `jest.mock('@react-navigation/native')` with a `mockNavigation` object (Jest only allows `mock*` names in mock factories).
 
-**Current screens:** `home` (map, title card with connection, scenario picker, friends panel) and `detail` (the selected friend, a native form sheet). Shared look: `@common/ui` (colours, `Avatar`, `StatusChip`, `DirectionArrow`).
+**Current screens:** `start` (event + number of friends; props only, no session yet), `home` (map, title card with connection, Leave, friends panel) and `detail` (the selected friend, a native form sheet). Shared look: `@common/ui` (colours, `Avatar`, `StatusChip`, `DirectionArrow`).

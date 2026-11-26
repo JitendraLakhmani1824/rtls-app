@@ -35,6 +35,10 @@ export type LiveSessionDeps = {
   profile: SessionProfile;
   /** Shown as the screen title. */
   title?: string;
+  /** Called by leave(): the app tears the session down and shows its start page. */
+  onLeave?: () => void;
+  /** Group overlapping pins (large sessions). Off: every friend is always their own pin. Default on. */
+  grouping?: boolean;
 };
 
 const TICK_MS = 1000;
@@ -43,6 +47,10 @@ const VIEWPORT_THROTTLE_MS = 150;
 const TRAIL_AGE_REFRESH_MS = 30_000;
 /** Fitting one friend (or friends in one spot) still shows this much around them, degrees (~200 m). */
 const MIN_FIT_SPAN_DEG = 0.002;
+/** Selecting a friend zooms in at least this far, so you can see them move. */
+const TRACK_ZOOM = 16;
+/** While following, re-centre once the friend has moved this share of the view. */
+const FOLLOW_SLACK = 0.15;
 
 /**
  * The controller. The only code that starts or stops anything.
@@ -81,8 +89,12 @@ export class LiveSession implements Session {
   private rowsCache: FriendRow[] = [];
   private readonly rowsVersion = createStore(0);
   private fitted = false;
-  /** The user moved the map: the app stops moving the camera. */
-  private cameraFree = false;
+  /**
+   * fit: keep everyone in view (at start) · follow: keep the selected friend in view ·
+   * free: the user moved the map, so the app leaves the camera alone.
+   */
+  private camera: 'fit' | 'follow' | 'free' = 'fit';
+  private followAt: [number, number] = [NaN, NaN];
 
   /** While the user pans or zooms, motion updates slow to the budget's gesture rate. */
   private readonly gestureMoving: ReturnType<typeof throttle>;
@@ -124,7 +136,7 @@ export class LiveSession implements Session {
       map.onPinPress((member) => this.select(member)),
       device.power.subscribe(() => this.applyBudget()),
       map.viewport.subscribe(() => {
-        if (map.viewport.get()?.gesturing) this.cameraFree = true; // the user took the camera
+        if (map.viewport.get()?.gesturing) this.camera = 'free'; // the user took the camera
         if (this.running) this.viewportChange.call();
       }),
     ];
@@ -140,12 +152,21 @@ export class LiveSession implements Session {
     return this.handle !== null;
   }
 
+  leave() {
+    this.pause();
+    this.deps.onLeave?.();
+  }
+
   select(member: number | null) {
     this.selected.set(member);
     if (member !== null && this.store.has(member)) {
-      // Bring the friend into view above the sheet; the camera is now the user's, so no re-fitting.
-      this.cameraFree = true;
-      this.deps.map.centerOn(this.store.lng(member), this.store.lat(member));
+      // Track the friend: zoom in to see them move, and keep them in view until the user pans.
+      this.camera = 'follow';
+      const zoom = Math.max(this.deps.map.viewport.get()?.zoom ?? 0, TRACK_ZOOM);
+      this.followAt = [this.store.lng(member), this.store.lat(member)];
+      this.deps.map.centerOn(this.followAt[0], this.followAt[1], zoom);
+    } else if (member === null && this.camera === 'follow') {
+      this.camera = 'free'; // the sheet closed: leave the view where it is
     }
     this.deps.map.setSelected(member);
     if (this.presenter.updateGliding(this.store, member)) this.sendMoving();
@@ -189,7 +210,8 @@ export class LiveSession implements Session {
       this.trails.reset(members.length, profile);
       this.presenter.reset(members.length);
       this.fitted = false;
-      this.cameraFree = false;
+      this.camera = 'fit';
+      this.presenter.setGrouping(this.deps.grouping ?? true);
       this.tickNo++;
       map.setMembers(members);
     },
@@ -291,14 +313,27 @@ export class LiveSession implements Session {
   };
 
   /**
-   * Keeps every friend in view: frames them all at start, and again only when someone leaves the
-   * view — until the user moves the map, after which the camera is theirs.
+   * fit: frames every friend at start, and again only when someone leaves the view.
+   * follow: re-centres on the selected friend once they move 15% of the view.
+   * free (after any user gesture): the camera is the user's.
    */
   private applyCamera() {
-    if (this.cameraFree) return;
     const { map } = this.deps;
     const view = map.viewport.get();
     const s = this.store;
+    if (this.camera === 'follow') {
+      const m = this.selected.get();
+      if (m === null || !s.has(m) || !view) return;
+      const drifted =
+        Math.abs(s.lng(m) - this.followAt[0]) > (view.east - view.west) * FOLLOW_SLACK ||
+        Math.abs(s.lat(m) - this.followAt[1]) > (view.north - view.south) * FOLLOW_SLACK;
+      if (drifted) {
+        this.followAt = [s.lng(m), s.lat(m)];
+        map.centerOn(this.followAt[0], this.followAt[1]);
+      }
+      return;
+    }
+    if (this.camera !== 'fit') return;
     let west = Infinity;
     let south = Infinity;
     let east = -Infinity;

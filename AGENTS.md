@@ -2,7 +2,7 @@
 
 Live location sharing for events: friends' pins and short trails on one map — smooth with hundreds of people on screen, cheap on battery. A case study (Principal Engineer, Mobile). Expo SDK 58 · React Native 0.88 (New Architecture) · TypeScript · MapLibre.
 
-**Status:** feature-complete for the brief: live map (still + gliding pins on the UI thread, trails, presence, my location), friend list and Detail sheet, demo scenario picker, sharing policy with a battery model, Low Power Mode budget. Default session: 10 friends. Results in `docs/results/`.
+**Status:** feature-complete for the brief: live map (still + gliding pins on the UI thread, trails, presence, my location), friend list and Detail sheet, demo scenario picker, sharing policy with a battery model, Low Power Mode budget. Default session: 4 friends plus you. Results in `docs/results/`.
 
 | Read                   | For                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------ |

@@ -4,6 +4,8 @@ Short log of choices made after the plan was closed. Newest first.
 
 | Date | Decision | Why | Cost / revisit when |
 | --- | --- | --- | --- |
+| 2026-11-26 | Grouping only above 30 friends; selecting a friend zooms in and follows them; the feed sends the last 5 min on open | The brief is about tracking friends: a small group should never hide anyone in a "2", trails should be there when you open the map (a real join snapshot carries them), and a selected friend should stay in view | Large sessions keep grouping and the original glide rule |
+| 2026-11-26 | App opens on a start page (event + 1–20 friends); Leave returns to it; scenario links skip it | A clear way in and out for a reviewer; measurement scripts keep using links | — |
 | 2026-11-26 | Scope trimmed: no 1,000-friend re-run, no fade comparison, no viewer power measurement; default session is 10 friends | The brief judges smooth pins, battery and structure, not grouping or a full matrix; a real group of friends is ~10 | Re-run the ladder if a reviewer asks for scale numbers |
 | 2026-11-26 | Sharing policy is a pure function of speed, watched, battery and Low Power Mode | Testable without a device; the battery model runs the same code | — |
 | 2026-11-26 | Ladder rungs B and C build a GeoJSON object per pin (the common way) and pass it through React state; no clustering, no gliding | They stand for what a typical app does, so each later step's gain is visible | — |

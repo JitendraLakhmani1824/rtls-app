@@ -13,6 +13,7 @@ import { SCENARIOS, type ScenarioName, type World } from './scenarios';
 
 export type SyntheticFeedOptions = {
   scenario: ScenarioName;
+  /** People in the scene, me included (member 0). */
   friends: number;
   seed: number;
   /** How often a moving friend sends a fix. */
@@ -34,6 +35,13 @@ const OFFLINE_SHARE = 0.04;
 const PAUSED_SHARE = 0.02;
 /** Some friends are indoors: poor accuracy (60–120 m) → an accuracy halo, no trail. */
 const INDOOR_SHARE = 0.03;
+/**
+ * On opening, a real server's snapshot carries each friend's recent trail. The fake replays the
+ * last few minutes of the scene, one batch per step, so trails show at once. Small groups only.
+ */
+const HISTORY_S = 300;
+const HISTORY_STEP_S = 5;
+const HISTORY_MAX_PEOPLE = 50;
 const PALETTE = [
   '#E4572E',
   '#17BEBB',
@@ -59,6 +67,7 @@ export class SyntheticFeedManager implements FeedManager {
   private readonly seq: Float64Array;
   private readonly silentFrom: Float64Array; // Infinity = never goes offline
   private readonly paused: Uint8Array;
+  private readonly wasMoving: Uint8Array;
   private readonly indoorAccuracy: Float64Array; // 0 = outdoors
   private readonly noiseX: Float64Array;
   private readonly noiseY: Float64Array;
@@ -80,6 +89,7 @@ export class SyntheticFeedManager implements FeedManager {
     this.seq = new Float64Array(n);
     this.silentFrom = new Float64Array(n).fill(Infinity);
     this.paused = new Uint8Array(n);
+    this.wasMoving = new Uint8Array(n);
     this.indoorAccuracy = new Float64Array(n);
     this.noiseX = new Float64Array(n);
     this.noiseY = new Float64Array(n);
@@ -111,8 +121,9 @@ export class SyntheticFeedManager implements FeedManager {
 
     sink.onMembers(this.members);
     sink.onState({ kind: 'live', sinceMs: now });
+    if (firstStart && this.members.length <= HISTORY_MAX_PEOPLE) this.sendHistory(sink, now);
     sink.onFixes(this.snapshot(now)); // like the server's snapshot: everyone's latest position
-    sink.onPresence(this.pauseFlags(now));
+    sink.onPresence(this.joinBeats(now));
 
     const stopTimer: Stop = this.clock.every(BATCH_MS, () => {
       if (stopped) return;
@@ -132,6 +143,18 @@ export class SyntheticFeedManager implements FeedManager {
     };
   }
 
+  /** The last HISTORY_S seconds of everyone moving, as batches ending just before `now`. */
+  private sendHistory(sink: FeedSink, now: number) {
+    for (let t = now - HISTORY_S * 1000; t < now; t += HISTORY_STEP_S * 1000) {
+      this.fixes.n = 0;
+      for (let i = 0; i < this.members.length; i++) {
+        if (!this.paused[i] && this.world.moving(i)) this.addFix(i, t);
+      }
+      if (this.fixes.n > 0) sink.onFixes(this.fixes);
+      this.world.step(this.rng, HISTORY_STEP_S);
+    }
+  }
+
   private intervalOf(i: number) {
     return this.world.moving(i) ? this.options.movingIntervalMs : STILL_FIX_MS;
   }
@@ -142,9 +165,14 @@ export class SyntheticFeedManager implements FeedManager {
     return this.fixes;
   }
 
-  private pauseFlags(now: number): PresenceBatch {
+  /** At join: pause flags, and a heartbeat from everyone standing still (so they show as still at once). */
+  private joinBeats(now: number): PresenceBatch {
     this.beats.n = 0;
-    for (let i = 0; i < this.members.length; i++) if (this.paused[i]) this.addBeat(i, now);
+    for (let i = 0; i < this.members.length; i++) {
+      const moving = this.world.moving(i);
+      this.wasMoving[i] = moving ? 1 : 0;
+      if (this.paused[i] || !moving) this.addBeat(i, now);
+    }
     return this.beats;
   }
 
@@ -157,9 +185,13 @@ export class SyntheticFeedManager implements FeedManager {
     this.beats.n = 0;
     for (let i = 0; i < this.members.length; i++) {
       if (now >= (this.silentFrom[i] ?? Infinity)) continue;
-      if (now >= (this.nextBeatAt[i] ?? 0)) {
+      const moving = this.world.moving(i);
+      const stopped = this.wasMoving[i] === 1 && !moving;
+      this.wasMoving[i] = moving ? 1 : 0;
+      // A phone that just stopped says so at once, as the sharing policy does; then once a minute.
+      if (stopped || now >= (this.nextBeatAt[i] ?? 0)) {
         this.nextBeatAt[i] = now + HEARTBEAT_MS;
-        if (!this.world.moving(i) || this.paused[i]) this.addBeat(i, now);
+        if (!moving || this.paused[i]) this.addBeat(i, now);
       }
       if (this.paused[i]) continue;
       if (now >= (this.nextFixAt[i] ?? 0)) {

@@ -134,6 +134,15 @@ describe('Presenter', () => {
       expect(p.isGliding(1)).toBe(true); // 1.5 m/s = 1.3 points/s: would not start, does not stop
     });
 
+    it('lets friends glide at any zoom when pins are never grouped (small sessions)', () => {
+      const store = storeWith(3, ...mover(1, 72, 40));
+      const p = presenterAt(view(12));
+      p.setGrouping(false);
+      p.updateVisibility(store);
+      p.updateGliding(store, null);
+      expect(p.isGliding(1)).toBe(true); // 40 m/s at zoom 12 is ~2.2 points/s
+    });
+
     it('glides nobody, not even the selected friend, when the budget allows none', () => {
       const store = storeWith(2, ...mover(1, 72, 5));
       const p = presenterAt(view(16), 0);

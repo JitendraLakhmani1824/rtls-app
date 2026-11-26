@@ -3,10 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHome } from './useHome';
-import { useScenarioPicker } from './useScenarioPicker';
 import { FriendList } from './views/FriendList';
 import { FriendsPanel } from './views/FriendsPanel';
-import { ScenarioPicker } from './views/ScenarioPicker';
 
 const CONNECTION_COLORS = {
   live: { color: colors.live, soft: colors.liveSoft },
@@ -17,7 +15,6 @@ const CONNECTION_COLORS = {
 /** The live map, a title card with the connection state, and the friends panel. */
 export function HomeScreen() {
   const home = useHome();
-  const picker = useScenarioPicker();
   const insets = useSafeAreaInsets();
   const tone = CONNECTION_COLORS[home.connection.kind];
   const { MapView } = home;
@@ -43,12 +40,12 @@ export function HomeScreen() {
           </View>
         </View>
         <Pressable
-          onPress={picker.open}
-          style={[styles.roundButton, shadow]}
+          onPress={home.leave}
+          style={({ pressed }) => [styles.leave, shadow, pressed && styles.leavePressed]}
           accessibilityRole="button"
-          accessibilityLabel="Demo scenario"
+          accessibilityLabel="Leave session"
         >
-          <Text style={styles.roundButtonText}>⋯</Text>
+          <Text style={styles.leaveText}>Leave</Text>
         </Pressable>
       </View>
       {home.showPanel && (
@@ -62,7 +59,6 @@ export function HomeScreen() {
           <FriendList />
         </FriendsPanel>
       )}
-      <ScenarioPicker picker={picker} />
     </View>
   );
 }
@@ -93,12 +89,13 @@ const styles = StyleSheet.create({
   },
   pillDot: { width: 7, height: 7, borderRadius: 4 },
   pillText: { fontSize: 13, fontWeight: '700' },
-  roundButton: {
-    width: 52,
+  leave: {
+    paddingHorizontal: 14,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roundButtonText: { fontSize: 22, fontWeight: '700', color: colors.ink, marginTop: -6 },
+  leavePressed: { backgroundColor: colors.subtle },
+  leaveText: { fontSize: 15, fontWeight: '700', color: colors.danger },
 });

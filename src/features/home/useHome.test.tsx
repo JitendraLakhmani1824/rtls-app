@@ -54,6 +54,13 @@ describe('useHome', () => {
     expect(result.current.title).toBe('Test session');
   });
 
+  it('leaves the session when asked', async () => {
+    const managers = createTestManagers();
+    const { result } = await renderHook(() => useHome(), { wrapper: wrapper(managers) });
+    await act(() => result.current.leave());
+    expect(managers.session.calls).toEqual(['leave']);
+  });
+
   it('opens and closes the friend list', async () => {
     const { result } = await renderHook(() => useHome(), {
       wrapper: wrapper(createTestManagers()),

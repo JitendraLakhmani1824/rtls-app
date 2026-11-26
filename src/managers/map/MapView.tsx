@@ -81,6 +81,7 @@ function MapLibreView({ model }: { model: MapViewModel }) {
       // Centred in the part of the map above the friend sheet.
       camera.easeTo({
         center: command.center,
+        zoom: command.zoom,
         padding: { top: 0, right: 0, bottom: 240, left: 0 },
         duration: CAMERA_MS,
       });
@@ -112,8 +113,9 @@ function MapLibreView({ model }: { model: MapViewModel }) {
       <Camera ref={cameraRef} initialViewState={model.initialView} />
       <Trails model={model} />
       <StillPins model={model} cameraRef={cameraRef} />
-      <GlidingPins model={model} />
+      {/* Me above every still friend; the selected friend (gliding) above me, so its name stays readable. */}
       <MePin model={model} />
+      <GlidingPins model={model} />
     </MapLibreMap>
   );
 }
@@ -146,7 +148,7 @@ function Trails({ model }: { model: MapViewModel }) {
   );
 }
 
-// ── Me: a blue dot with a soft halo, never grouped, drawn above every friend ───────
+// ── Me: a blue dot with a soft halo, never grouped, drawn above still friends ───────
 
 function MePin({ model }: { model: MapViewModel }) {
   const data = useSyncExternalStore(model.meData.subscribe, model.meData.get);
@@ -244,7 +246,7 @@ function StillPins({
       id="pins-still"
       ref={sourceRef}
       data={data}
-      cluster
+      cluster={model.groupPins}
       clusterRadius={PIN_GROUP_RADIUS}
       clusterMaxZoom={CLUSTER_MAX_ZOOM}
       onPress={onPress}

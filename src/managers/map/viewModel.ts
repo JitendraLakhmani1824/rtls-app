@@ -13,7 +13,7 @@ export type MemberTable = { colours: string[]; initials: string[]; names: string
 /** A camera move asked for by the session; `seq` makes a repeated request a new value. */
 export type CameraCommand =
   | { seq: number; kind: 'fit'; bounds: [west: number, south: number, east: number, north: number] }
-  | { seq: number; kind: 'center'; center: [lng: number, lat: number] };
+  | { seq: number; kind: 'center'; center: [lng: number, lat: number]; zoom?: number };
 
 /** Where the selected friend's drawn trail ends; the worklet joins it to the gliding pin. */
 export type TrailTip = { version: number; lng: number; lat: number };
@@ -22,6 +22,8 @@ export type TrailTip = { version: number; lng: number; lat: number };
 export interface MapViewModel {
   readonly initialView: { center: [number, number]; zoom: number };
   readonly mapStyle: StyleSpecification;
+  /** Group overlapping pins (large sessions only). */
+  readonly groupPins: boolean;
   readonly stillData: Store<string>;
   readonly cameraCommand: Store<CameraCommand | null>;
   /** The selected member, for the still pins' feature state. */

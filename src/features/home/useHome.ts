@@ -44,5 +44,6 @@ export function useHome() {
     showPanel: selected === null,
     listOpen,
     toggleList: () => setListOpen((open) => !open),
+    leave: () => session.leave(),
   };
 }

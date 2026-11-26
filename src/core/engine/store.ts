@@ -83,7 +83,11 @@ export class LocationStore {
     return changed.length;
   }
 
-  /** Heartbeats and pause flags. Returns true if any member's pause state changed. */
+  /**
+   * Heartbeats and pause flags. A heartbeat comes from a phone that is standing still, so one newer
+   * than the last fix also sets the speed to 0: we stop expecting a fix every second.
+   * Returns true if any member's pause state changed.
+   */
   heartbeat(batch: PresenceBatch): boolean {
     let pauseChanged = false;
     for (let i = 0; i < batch.n; i++) {
@@ -93,6 +97,7 @@ export class LocationStore {
       const b = m * STRIDE;
       const heard = batch.buf[o + 1] ?? NaN;
       if (!(heard <= (this.data[b + HEARD] ?? NaN))) this.data[b + HEARD] = heard;
+      if (heard >= (this.data[b + T] ?? NaN)) this.data[b + SPEED] = 0;
       const paused = batch.buf[o + 2] === 1 ? 1 : 0;
       if (this.data[b + PAUSED] !== paused) {
         this.data[b + PAUSED] = paused;

@@ -45,13 +45,22 @@ describe('scenarios', () => {
     expect(movingNow).toBeGreaterThan(200 * 0.6);
   });
 
-  it('trip: cars of four drive at 12–25 m/s along one road', () => {
-    const { fastest, world } = simulate('trip', 8, 60);
+  it('trip: cars drive at 12–25 m/s along one road; a large group shares cars of four', () => {
+    const { fastest, world } = simulate('trip', 40, 60);
     expect(fastest).toBeLessThanOrEqual(25.5);
     expect(fastest).toBeGreaterThan(12);
-    // friends 0 and 2 share a car (2 cars for 8 people): they stay within a couple of metres
+    // 10 cars for 40 people: 0 and 10 share a car, so they stay within a couple of metres
     expect(
-      Math.hypot((world.x[0] ?? 0) - (world.x[2] ?? 0), (world.y[0] ?? 0) - (world.y[2] ?? 0)),
+      Math.hypot((world.x[0] ?? 0) - (world.x[10] ?? 0), (world.y[0] ?? 0) - (world.y[10] ?? 0)),
     ).toBeLessThan(3);
+  });
+
+  it('trip: a small group drives a convoy, one car each, so nobody hides under another pin', () => {
+    const { world } = simulate('trip', 8, 30);
+    for (let i = 1; i < 8; i++) {
+      expect(
+        Math.hypot((world.x[0] ?? 0) - (world.x[i] ?? 0), (world.y[0] ?? 0) - (world.y[i] ?? 0)),
+      ).toBeGreaterThan(3);
+    }
   });
 });

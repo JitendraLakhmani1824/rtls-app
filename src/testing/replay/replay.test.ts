@@ -76,7 +76,7 @@ describe('replay fingerprint (seed 42, 60 s, all faults on)', () => {
   it.each([
     ['concert', { still: 63, moving: 174, trails: 10, hash: '887c8778' }],
     ['marathon', { still: 64, moving: 287, trails: 29, hash: '18690f8f' }],
-    ['trip', { still: 59, moving: 245, trails: 61, hash: '50895743' }],
+    ['trip', { still: 52, moving: 245, trails: 61, hash: '11e703b2' }],
   ] as const)('%s sends the same frames to the map as before', (scenario, expected) => {
     expect(replay(scenario)).toEqual(expected);
   });

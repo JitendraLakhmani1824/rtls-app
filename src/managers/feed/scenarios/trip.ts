@@ -14,10 +14,15 @@ const ROAD: [number, number][] = [
 ];
 const LENGTHS = cumulative(ROAD);
 const SEATS = 4;
+/** A small group drives as a convoy, one car each, so every friend stays visible on the map. */
+const CONVOY_MAX_PEOPLE = 21;
 const STOP_CHANCE_PER_S = 1 / 120; // a stop roughly every two minutes per car
 const STOP_S = 45;
 
-/** A convoy: friends ride in cars of up to four, at 12–25 m/s, with occasional stops. Cars turn back at the road's end. */
+/**
+ * A road trip: friends in cars at 12–25 m/s, with occasional stops; cars turn back at the road's
+ * end. A small group drives a convoy (one car each); larger ones share cars of four.
+ */
 export const trip: Scenario = {
   title: 'Road trip',
   profile: 'trip',
@@ -39,7 +44,8 @@ class TripWorld implements World {
   private readonly carStoppedFor: Float64Array;
 
   constructor(rng: Rng, people: number) {
-    const cars = Math.max(1, Math.ceil(people / SEATS));
+    const seats = people <= CONVOY_MAX_PEOPLE ? 1 : SEATS;
+    const cars = Math.max(1, Math.ceil(people / seats));
     const total = LENGTHS[LENGTHS.length - 1] ?? 1;
     this.x = new Float64Array(people);
     this.y = new Float64Array(people);

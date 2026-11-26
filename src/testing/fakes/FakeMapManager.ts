@@ -57,8 +57,8 @@ export class FakeMapManager implements MapManager {
   fitTo(west: number, south: number, east: number, north: number) {
     this.fits.push([west, south, east, north]);
   }
-  centerOn(lng: number, lat: number) {
-    this.centers.push([lng, lat]);
+  centerOn(lng: number, lat: number, zoom?: number) {
+    this.centers.push(zoom === undefined ? [lng, lat] : [lng, lat, zoom]);
   }
   setFrameRateCap(fps: number) {
     this.frameRateCaps.push(fps);

@@ -35,6 +35,7 @@ export class Presenter {
   private budget: Budget = { glideLimit: 30, glideFps: 60, gestureUpdatesPerSec: 4 };
   private visible = new Uint8Array(0);
   private visibleN = 0;
+  private grouping = true;
   private glidingFlag = new Uint8Array(0); // mirrors `gliding`, for the per-member loops
   // The viewport's centre and padded half-sizes, for entering and for leaving the screen.
   private cx = 0;
@@ -57,6 +58,11 @@ export class Presenter {
     this.glidingFlag = new Uint8Array(memberCount);
     this.lastPresence = new Uint8Array(memberCount).fill(255);
     this.gliding.clear();
+  }
+
+  /** With grouping off (small sessions), pins are never hidden in a group, so friends may glide at any zoom. */
+  setGrouping(on: boolean) {
+    this.grouping = on;
   }
 
   setBudget(budget: Budget) {
@@ -126,7 +132,7 @@ export class Presenter {
       this.next.add(selected);
     }
     const zoom = this.viewport?.zoom ?? CLUSTER_MAX_ZOOM;
-    if (glideLimit > 0 && zoom >= CLUSTER_MAX_ZOOM) {
+    if (glideLimit > 0 && (zoom >= CLUSTER_MAX_ZOOM || !this.grouping)) {
       const c = this.candidates;
       c.length = 0;
       for (let m = 0; m < store.size; m++) {

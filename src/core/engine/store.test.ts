@@ -115,4 +115,15 @@ describe('LocationStore', () => {
     expect(store.heartbeat(beats([1, 3000, 0]))).toBe(true);
     expect(store.paused(1)).toBe(false);
   });
+
+  it('treats a heartbeat newer than the last fix as standing still', () => {
+    const store = storeOf(1);
+    const changed: number[] = [];
+    store.ingest(batch([0, 1, 72, 19, 0], [0, 2, 72, 19 + 2 * NORTH_1M, 1000]), changed);
+    expect(store.speed(0)).toBeGreaterThan(1);
+    store.heartbeat(beats([0, 500, 0])); // older than the last fix: ignored
+    expect(store.speed(0)).toBeGreaterThan(1);
+    store.heartbeat(beats([0, 2000, 0]));
+    expect(store.speed(0)).toBe(0);
+  });
 });

@@ -50,6 +50,27 @@ describe('SyntheticFeedManager', () => {
     expect(fixes.filter((f) => f[4] === t0)).toHaveLength(50);
   });
 
+  it('sends the last few minutes of everyone moving first, so trails show at once', () => {
+    const { fixes, t0 } = run(options('marathon', 10), 0);
+    const history = fixes.filter((f) => (f[4] ?? 0) < t0);
+    expect(history.length).toBeGreaterThan(100);
+    expect(Math.min(...history.map((f) => f[4] ?? 0))).toBe(t0 - 300_000);
+  });
+
+  it('sends no history to large sessions, which are for measuring', () => {
+    const { fixes, t0 } = run(options('marathon', 200), 0);
+    expect(fixes.filter((f) => (f[4] ?? 0) < t0)).toHaveLength(0);
+  });
+
+  it('sends a heartbeat as soon as a moving friend stops, not up to a minute later', () => {
+    const { fixes, beats } = run(options('trip', 12), 4 * 60_000); // cars stop every ~2 min
+    const quickBeats = beats.filter((b) => {
+      const t = b[1] ?? 0;
+      return fixes.some((f) => f[0] === b[0] && t - (f[4] ?? 0) > 0 && t - (f[4] ?? 0) <= 1000);
+    });
+    expect(quickBeats.length).toBeGreaterThan(0);
+  });
+
   it('produces the same fixes and heartbeats for the same seed', () => {
     const a = run(options('marathon'), 20_000);
     const b = run(options('marathon'), 20_000);

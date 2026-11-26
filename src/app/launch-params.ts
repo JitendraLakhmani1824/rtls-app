@@ -11,6 +11,7 @@ const RUNGS: readonly Rung[] = ['A', 'B', 'C', 'D'];
 
 export type LaunchParams = {
   scenario: ScenarioName;
+  /** Friends in the session, not counting me. */
   friends: number;
   seed: number;
   /** How often a moving friend sends a fix, ms. */
@@ -26,7 +27,7 @@ export type LaunchParams = {
 
 export const DEFAULT_PARAMS: LaunchParams = {
   scenario: 'concert',
-  friends: 10, // a real group of friends; scale runs pass friends= in the link
+  friends: 4, // a real group of friends; scale runs pass friends= in the link
   seed: 42,
   intervalMs: 1000,
   rung: 'D',
@@ -74,21 +75,51 @@ export function parseLaunchUrl(
 
 export const paramsKey = (p: LaunchParams) => JSON.stringify(p);
 
-/** The current launch parameters: from the link that opened the app, then from any link opened later. */
-export function useLaunchParams(): LaunchParams | null {
-  const [params, setParams] = useState<LaunchParams | null>(null);
+/** True for a scenario link (`rtls://scenario?…`), which skips the start page. */
+export const isScenarioLink = (url: string | null | undefined) =>
+  !!url?.match(/^rtls:\/\/scenario/);
+
+export type Launch = {
+  /** False until the link that opened the app (if any) has been read. */
+  ready: boolean;
+  /** The session to show, or null for the start page. */
+  params: LaunchParams | null;
+  /** From the start page: open the map with these parameters. */
+  start(params: LaunchParams): void;
+  /** Leave the session: back to the start page. */
+  exit(): void;
+};
+
+/**
+ * What to show: the start page, or a session. A scenario link (at launch or later) opens a session
+ * directly; the start page opens one with the user's choices; leaving returns to the start page.
+ */
+export function useLaunch(): Launch {
+  const [state, setState] = useState<{ ready: boolean; params: LaunchParams | null }>({
+    ready: false,
+    params: null,
+  });
   useEffect(() => {
     let cancelled = false;
     void Linking.getInitialURL().then((url) => {
-      if (!cancelled) setParams((current) => current ?? parseLaunchUrl(url ?? null));
+      if (cancelled) return;
+      setState((s) =>
+        s.ready
+          ? s
+          : { ready: true, params: isScenarioLink(url) ? parseLaunchUrl(url ?? null) : null },
+      );
     });
-    const subscription = Linking.addEventListener('url', ({ url }) =>
-      setParams(parseLaunchUrl(url)),
-    );
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      if (isScenarioLink(url)) setState({ ready: true, params: parseLaunchUrl(url) });
+    });
     return () => {
       cancelled = true;
       subscription.remove();
     };
   }, []);
-  return params;
+  return {
+    ...state,
+    start: (params) => setState({ ready: true, params }),
+    exit: () => setState({ ready: true, params: null }),
+  };
 }

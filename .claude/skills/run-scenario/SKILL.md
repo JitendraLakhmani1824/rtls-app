@@ -12,7 +12,7 @@ description: Build and run the RTLS app on the iOS simulator or the USB-connecte
 | Param | Meaning | Default |
 | --- | --- | --- |
 | `name` | `concert` (event: most people standing), `marathon` (race: runners on a 5 km loop), `trip` (convoy of cars on a 24 km road) | concert |
-| `friends` | People in the session (1–5000) | 10 |
+| `friends` | Friends in the session, not counting you (1–5000) | 4 |
 | `interval` | Ms between fixes for a moving friend | 1000 |
 | `seed` | Same seed → same crowd | 42 |
 | `faults` | Comma list of `drops` (10% lost), `dups` (5% twice), `reorder` (5% late), `jumps` (2% thrown 300 m) | none |

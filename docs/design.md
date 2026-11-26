@@ -467,7 +467,8 @@ stateDiagram-v2
   - `onState` → publish `connection` immediately.
   - `onSessionEnded` → stop and show "Session ended".
 - **Pin taps.** The session listens to `map.onPinPress` and calls `select(id)`. Screens only react to `selected`.
-- **Camera:** frames every friend at start, and again only when someone leaves the view. Any user gesture hands the camera to the user for the rest of the session. No camera buttons: the brief doesn't need them.
+- **Camera:** *fit* frames every friend at start, and again when someone leaves the view. Selecting a friend switches to *follow*: zoom in to at least 16 and re-centre when they move 15% of the view. Any user gesture switches to *free*. No camera buttons.
+- **Grouping:** only for sessions over 30 friends. A group of friends always shows every friend, and they may glide at any zoom.
 - **Lazy snapshot.** `rows`, `selected` and `connection` are separate readables. `rows` is computed at most once per tick, only when read, and subscribers hear about it only while subscribed.
 
 ## 2.5 Map (`managers/map`)
@@ -510,8 +511,9 @@ stateDiagram-v2
 - **Shape:** `XScreen` wires `useX()` to views. `useX` is the only file that uses `useManagers()` and navigation, and returns data + actions. Function components only; the one class is `ErrorBoundary`.
 - **Snapshot hooks:** `useRows()`, `useSelected()`, `useConnection()` — `useSyncExternalStore` over the session's readables. Nothing subscribes to per-frame data. The friend list mounts only when the panel is expanded, so collapsed means `rows` is never computed.
 - **Text:** the snapshot carries distance and bearing from me, and age, as numbers; rows arrive sorted by distance. `common/utils` formats "350 m NE" and "updated 10 s ago".
-- **Home:** full-screen `MapView`; a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05"); a demo-scenario picker that reopens the app's own scenario link; the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`, which centres the friend above the sheet. When `selected` becomes non-null, `useHome` navigates to `Friend` and hides the panel: one bottom surface at a time.
-- **Markers:** friends are initials in their colour with a white ring and shadow; Recent fades, Stale turns grey; names show from zoom 16. The selected friend gets a soft glow, a white ring in their colour, their name, and a one-off ripple (no endless animation). Me is a blue dot with a halo in its own source: never grouped, always on top.
+- **Start:** the first page (outside any session): event (concert / marathon / road trip) and number of friends, 1–20, then "Open live map". `app/Root` builds the session from the choice; a scenario link skips the page.
+- **Home:** full-screen `MapView`; a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05") and a Leave button (`session.leave()` → back to Start); the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`, which centres the friend above the sheet. When `selected` becomes non-null, `useHome` navigates to `Friend` and hides the panel: one bottom surface at a time.
+- **Markers:** friends are initials in their colour with a white ring and shadow; Recent fades, Stale turns grey; names show from zoom 16. The selected friend gets a soft glow, a white ring in their colour, their name, and a one-off ripple (no endless animation). Me is a blue dot with a halo in its own source: never grouped, above every still friend (the selected friend draws above it, so its name stays readable).
 - **Detail:** React Navigation native-stack screen `Friend`:
   - `presentation: 'formSheet'`;
   - at most three fixed `sheetAllowedDetents`;
