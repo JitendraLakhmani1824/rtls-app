@@ -48,3 +48,6 @@ coverage/
 
 # Claude Code hook state
 .claude/.state/
+
+# the company brief stays local (not published)
+docs/brief/

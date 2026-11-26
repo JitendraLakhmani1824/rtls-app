@@ -28,7 +28,7 @@ v1.0 · **Final** · 2026-11-26. Later changes are logged in `docs/decisions.md`
 ## 2. Pre-flight
 
 1. `git init`, `main` branch. Node 22, pnpm 10, Xcode 26.6 and adb are installed.
-2. Move the brief PDF to `docs/brief/`.
+2. Keep the brief PDF local: `docs/brief/` is git-ignored.
 3. `eas login` (you), then `eas init`.
 
 ---
