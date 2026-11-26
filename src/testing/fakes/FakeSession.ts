@@ -10,9 +10,6 @@ export class FakeSession implements Session {
   readonly rows = createStore<FriendRow[]>([]);
   readonly calls: string[] = [];
 
-  leave() {
-    this.calls.push('leave');
-  }
   select(member: number | null) {
     this.calls.push(`select ${member}`);
     this.selected.set(member);
@@ -22,6 +19,7 @@ export class FakeSession implements Session {
 export function fakeRow(id: number, more: Partial<FriendRow> = {}): FriendRow {
   return {
     id,
+    key: `friend-${id}`,
     name: `Friend ${id}`,
     initials: `F${id}`,
     colour: '#334155',
@@ -30,6 +28,7 @@ export function fakeRow(id: number, more: Partial<FriendRow> = {}): FriendRow {
     bearingDeg: 45,
     silentMs: 2000,
     speedMs: 0,
+    coveredM: 0,
     ...more,
   };
 }

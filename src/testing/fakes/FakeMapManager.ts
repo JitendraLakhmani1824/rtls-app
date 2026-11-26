@@ -1,4 +1,5 @@
 import {
+  type CameraMove,
   MOTION_STRIDE,
   PIN_STRIDE,
   TRAIL_STRIDE,
@@ -27,8 +28,10 @@ export class FakeMapManager implements MapManager {
   readonly frameRateCaps: number[] = [];
   /** Every fitTo, as [west, south, east, north]. */
   readonly fits: number[][] = [];
-  /** Every centerOn, as [lng, lat]. */
-  readonly centers: number[][] = [];
+  /** How each fitTo animated. */
+  readonly fitPaths: ('fly' | 'ease')[] = [];
+  /** Every camera move. */
+  readonly moves: CameraMove[] = [];
   private pressListeners = new Set<(member: number) => void>();
 
   setMembers(members: Member[]) {
@@ -54,11 +57,18 @@ export class FakeMapManager implements MapManager {
       })),
     );
   }
-  fitTo(west: number, south: number, east: number, north: number) {
+  fitTo(
+    west: number,
+    south: number,
+    east: number,
+    north: number,
+    how?: { ms: number; path: 'fly' | 'ease' },
+  ) {
     this.fits.push([west, south, east, north]);
+    this.fitPaths.push(how?.path ?? 'ease');
   }
-  centerOn(lng: number, lat: number, zoom?: number) {
-    this.centers.push(zoom === undefined ? [lng, lat] : [lng, lat, zoom]);
+  moveCamera(move: CameraMove) {
+    this.moves.push({ ...move });
   }
   setFrameRateCap(fps: number) {
     this.frameRateCaps.push(fps);

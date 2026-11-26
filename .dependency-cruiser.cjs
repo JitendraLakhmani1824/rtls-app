@@ -84,6 +84,12 @@ module.exports = {
       },
     },
     {
+      comment:
+        'managers-storage-libraries — managers/storage is the only folder that may import AsyncStorage.',
+      from: { path: '^src/managers/storage/' },
+      to: { path: npm('@react-native-async-storage/async-storage') },
+    },
+    {
       comment: 'common-core — common/* may import core/protocols, core/models and core/utils.',
       from: { path: '^src/common/' },
       to: { path: CORE_BASE },
@@ -95,14 +101,14 @@ module.exports = {
     },
     {
       comment:
-        'common-libraries — common/* may import React, React Native and React Navigation types.',
+        'common-libraries — common/* may import React, React Native, React Navigation types and safe-area.',
       from: { path: '^src/common/' },
-      to: { path: npm(...REACT, '@react-navigation/[^/]+') },
+      to: { path: npm(...REACT, '@react-navigation/[^/]+', 'react-native-safe-area-context') },
     },
     {
       comment:
-        'core-engine-sharing — core/engine and core/sharing may import core/protocols, core/models and core/utils; only app/, lab/ and testing/ may import them.',
-      from: { path: '^src/core/(?:engine|sharing)/' },
+        'core-engine-sharing-sessions — core/engine, core/sharing and core/sessions may import core/protocols, core/models and core/utils; only app/, lab/ and testing/ may import them.',
+      from: { path: '^src/core/(?:engine|sharing|sessions)/' },
       to: { path: CORE_BASE },
     },
     {

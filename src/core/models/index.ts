@@ -119,6 +119,8 @@ export type ConnState = { kind: 'live' | 'reconnecting' | 'offline'; sinceMs: nu
 /** A friend as the list and the Detail sheet show it. Plain numbers; screens format them. */
 export type FriendRow = {
   id: number;
+  /** The person's key (Person.key), the same in every session. */
+  key: string;
   name: string;
   initials: string;
   colour: string;
@@ -131,7 +133,62 @@ export type FriendRow = {
   /** Since we last heard from them (fix or heartbeat), ms; NaN if never. */
   silentMs: number;
   speedMs: number;
+  /** Distance moved since the session's data starts, metres (moves under walking pace don't count). */
+  coveredM: number;
 };
 
 /** Where a feed stopped, so it can resume without gaps. Opaque to everyone but the feed. */
 export type Cursor = { readonly feedPosition: number };
+
+/**
+ * A camera move. `fly` zooms out, travels and zooms in (long hops); `ease` eases in and out;
+ * `linear` keeps a constant speed (following a gliding pin). Pitch and bearing in degrees.
+ */
+export type CameraMove = {
+  lng: number;
+  lat: number;
+  zoom?: number;
+  pitch?: number;
+  bearing?: number;
+  ms: number;
+  path: 'fly' | 'ease' | 'linear';
+};
+
+// ── People and sessions (the address book; not on the hot path) ─────────────────
+
+export type EventKind = 'concert' | 'marathon' | 'trip';
+export const EVENT_KINDS: readonly EventKind[] = ['concert', 'marathon', 'trip'];
+
+export type Circle = 'family' | 'friends';
+
+/** Someone you know. `key` is stable for the life of the app on this phone. */
+export type Person = { key: string; name: string; circle: Circle };
+
+/** A session holds you and up to this many friends. */
+export const MAX_FRIENDS = 20;
+
+/** The key of the phone's owner in every session. */
+export const ME_KEY = 'me';
+
+/** One person in a session. The order is the same on every phone that joined (it seeds the simulation). */
+export type SessionPerson = { key: string; name: string };
+
+export type SessionRecord = {
+  /** Also the invite code: 6 letters and digits. */
+  id: string;
+  title: string;
+  event: EventKind;
+  /** Everyone in the session, me included (key ME_KEY). */
+  people: SessionPerson[];
+  createdAt: number;
+};
+
+/** What an invite link carries. Without a server, the link itself is the session. */
+export type Invite = {
+  code: string;
+  event: EventKind;
+  title: string;
+  /** Everyone in the session, in order; `from` is the index of whoever sent it. */
+  names: string[];
+  from: number;
+};

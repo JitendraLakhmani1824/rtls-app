@@ -1,6 +1,7 @@
 import {
   MOTION_STRIDE,
   PIN_STRIDE,
+  type CameraMove,
   type Member,
   type MotionFrame,
   type PinFrame,
@@ -134,14 +135,22 @@ export class MapLibreManager implements MapManager, MapViewModel {
     this.mapFps.set(Math.max(MIN_MAP_FPS, fps));
   }
 
-  fitTo(west: number, south: number, east: number, north: number) {
+  fitTo(
+    west: number,
+    south: number,
+    east: number,
+    north: number,
+    how: { ms: number; path: 'fly' | 'ease' } = { ms: 600, path: 'ease' },
+  ) {
     const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
-    this.cameraCommand.set({ seq, kind: 'fit', bounds: [west, south, east, north] });
+    this.cameraCommand.set({ seq, kind: 'fit', bounds: [west, south, east, north], ...how });
   }
 
-  centerOn(lng: number, lat: number, zoom?: number) {
+  moveCamera(move: CameraMove) {
+    // Never hand the map a NaN: it would throw away the whole camera state.
+    if (!Number.isFinite(move.lng) || !Number.isFinite(move.lat)) return;
     const seq = (this.cameraCommand.get()?.seq ?? 0) + 1;
-    this.cameraCommand.set({ seq, kind: 'center', center: [lng, lat], zoom });
+    this.cameraCommand.set({ seq, kind: 'move', move });
   }
 
   setSelected(member: number | null) {

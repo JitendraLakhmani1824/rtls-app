@@ -1,38 +1,30 @@
 import { ManagersProvider } from '@common/di';
-import { StartScreen, type StartChoice } from '@features/start';
+import type { RootStack } from '@common/navigation';
 import { RungAScreen, RungBCScreen } from '@lab/ladder';
-import { NavigationContainer } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
+import { NavigationContainer, type InitialState } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { createContainer, VENUE } from './container';
-import { DEFAULT_PARAMS, paramsKey, useLaunch, type LaunchParams } from './launch-params';
+import { createApp, SCENARIO_ID, VENUE, type App } from './container';
+import { paramsKey, useLaunch, type LaunchParams } from './launch-params';
+import { linking } from './linking';
 import { AppNavigation } from './navigation';
 
 /**
- * The start page, or a session. A scenario link opens a session directly; the start page opens one
- * with the user's choices; leaving a session returns to the start page.
+ * The app: sessions and friends in tabs, each session's live map, deep links. A scenario link
+ * (measurement) opens that scenario's map directly, or a comparison rung from the lab.
  */
 export function Root() {
   const launch = useLaunch();
-  const [lastChoice, setLastChoice] = useState<StartChoice>();
+  const [app] = useState(createApp);
+  useEffect(() => app.start(), [app]);
+  const { loaded } = app.screens.sessions;
+  const ready = useSyncExternalStore(loaded.subscribe, loaded.get);
   if (!launch.ready) return null;
   const params = launch.params;
-  if (!params) {
-    return (
-      <SafeAreaProvider>
-        <StartScreen
-          initial={lastChoice}
-          onStart={(choice) => {
-            setLastChoice(choice);
-            launch.start({ ...DEFAULT_PARAMS, ...choice });
-          }}
-        />
-      </SafeAreaProvider>
-    );
-  }
   // A new scenario rebuilds everything from scratch (the key changes).
-  if (params.rung === 'A') {
+  if (params?.rung === 'A') {
     return (
       <RungAScreen
         key={paramsKey(params)}
@@ -44,7 +36,7 @@ export function Root() {
       />
     );
   }
-  if (params.rung === 'B' || params.rung === 'C') {
+  if (params?.rung === 'B' || params?.rung === 'C') {
     return (
       <RungBCScreen
         key={paramsKey(params)}
@@ -57,16 +49,26 @@ export function Root() {
       />
     );
   }
-  return <AppShell key={paramsKey(params)} params={params} onLeave={launch.exit} />;
+  if (!ready) return null; // the saved book loads in a few milliseconds
+  return <AppShell key={params ? paramsKey(params) : 'app'} app={app} scenario={params} />;
 }
 
-function AppShell({ params, onLeave }: { params: LaunchParams; onLeave: () => void }) {
-  const [container] = useState(() => createContainer(params, onLeave));
-  useEffect(() => container.start(), [container]);
+function AppShell({ app, scenario }: { app: App; scenario: LaunchParams | null }) {
+  const [initialState] = useState(() => {
+    if (!scenario) return undefined;
+    app.openScenario(scenario);
+    const routes: { name: keyof RootStack; params?: object }[] = [
+      { name: 'Tabs' },
+      { name: 'SessionMap', params: { id: SCENARIO_ID } },
+    ];
+    return { routes } as InitialState;
+  });
   return (
     <SafeAreaProvider>
-      <ManagersProvider value={container.screens}>
-        <NavigationContainer>
+      {/* Every screen is light (pages and the map): dark status-bar icons on both platforms. */}
+      <StatusBar style="dark" />
+      <ManagersProvider value={app.screens}>
+        <NavigationContainer linking={linking} initialState={initialState}>
           <AppNavigation />
         </NavigationContainer>
       </ManagersProvider>

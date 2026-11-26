@@ -8,6 +8,7 @@ import { useDetail } from './useDetail';
 let mockBeforeRemove: (() => void) | null = null;
 const mockNavigation = {
   goBack: jest.fn(),
+  navigate: jest.fn(),
   canGoBack: () => true,
   addListener: (_event: string, listener: () => void) => {
     mockBeforeRemove = listener;
@@ -31,7 +32,7 @@ async function setup() {
 }
 
 describe('useDetail', () => {
-  beforeEach(() => mockNavigation.goBack.mockClear());
+  beforeEach(() => jest.clearAllMocks());
 
   it('shows the selected friend: status, distance and direction', async () => {
     const { result } = await setup();
@@ -63,5 +64,15 @@ describe('useDetail', () => {
     const { session } = await setup();
     await act(() => mockBeforeRemove?.());
     expect(session.calls).toEqual(['select null']);
+  });
+
+  it('opens the full page after closing the sheet: never a sheet over a sheet', async () => {
+    const { result } = await setup();
+    await act(() => result.current.details());
+    expect(mockNavigation.goBack).toHaveBeenCalled();
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Person', { key: 'friend-1' });
+    expect(mockNavigation.goBack.mock.invocationCallOrder[0]).toBeLessThan(
+      mockNavigation.navigate.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 });

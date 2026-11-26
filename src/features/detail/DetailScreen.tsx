@@ -1,5 +1,4 @@
-import { Avatar, colors, DirectionArrow, radius, StatusChip } from '@common/ui';
-import type { ReactNode } from 'react';
+import { Avatar, Chevron, colors, DirectionArrow, radius, StatTile, StatusChip } from '@common/ui';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,7 +6,7 @@ import { useDetail } from './useDetail';
 
 /** The selected friend, in a native sheet over the live map (the map stays visible and touchable). */
 export function DetailScreen() {
-  const { friend, close } = useDetail();
+  const { friend, close, details } = useDetail();
   // iOS sheets already clear the home indicator; on Android, keep content above the navigation bar.
   const bottom = useSafeAreaInsets().bottom;
   const pad = { paddingBottom: Platform.OS === 'ios' ? 16 : bottom + 20 };
@@ -43,29 +42,27 @@ export function DetailScreen() {
       </View>
 
       <View style={styles.tiles}>
-        <Tile label="Distance" value={friend.distance} />
-        <Tile
+        <StatTile label="Distance" value={friend.distance} />
+        <StatTile
           label="Direction"
           value={friend.direction}
           icon={<DirectionArrow bearingDeg={friend.bearingDeg} size={16} color={colors.ink} />}
         />
-        <Tile label="Moving" value={friend.movement} />
+        <StatTile label="Moving" value={friend.movement} />
       </View>
 
-      <Text style={styles.updated}>{friend.updated}</Text>
-    </View>
-  );
-}
-
-function Tile({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
-  return (
-    <View style={styles.tile}>
-      <Text style={styles.tileLabel}>{label}</Text>
-      <View style={styles.tileValueRow}>
-        {icon}
-        <Text style={styles.tileValue} numberOfLines={1}>
-          {value}
-        </Text>
+      <View style={styles.footer}>
+        <Text style={styles.updated}>{friend.updated}</Text>
+        <Pressable
+          onPress={details}
+          hitSlop={8}
+          style={({ pressed }) => [styles.details, pressed && styles.detailsPressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`View details for ${friend.name}`}
+        >
+          <Text style={styles.detailsText}>View details</Text>
+          <Chevron color={colors.accent} size={8} direction="right" />
+        </Pressable>
       </View>
     </View>
   );
@@ -87,16 +84,17 @@ const styles = StyleSheet.create({
   },
   closeText: { fontSize: 14, fontWeight: '700', color: colors.muted },
   tiles: { flexDirection: 'row', gap: 10 },
-  tile: {
-    flex: 1,
-    backgroundColor: colors.subtle,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 4,
-  },
-  tileLabel: { fontSize: 12, fontWeight: '600', color: colors.muted },
-  tileValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tileValue: { fontSize: 17, fontWeight: '700', color: colors.ink },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   updated: { fontSize: 13, color: colors.faint },
+  details: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentSoft,
+  },
+  detailsPressed: { opacity: 0.8 },
+  detailsText: { fontSize: 14, fontWeight: '700', color: colors.accent },
 });

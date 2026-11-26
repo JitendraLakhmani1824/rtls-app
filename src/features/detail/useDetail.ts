@@ -1,13 +1,12 @@
-import { useManagers, useRows, useSelected } from '@common/di';
+import { useLive, useRows, useSelected } from '@common/di';
 import type { RootStack } from '@common/navigation';
 import {
   formatAgo,
   formatDirection,
   formatDistance,
   formatMovement,
-  presenceLabel,
+  statusText,
 } from '@common/utils';
-import { Presence } from '@core/models';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
@@ -17,20 +16,20 @@ import { useEffect } from 'react';
  * Selection cleared elsewhere → the sheet closes; the sheet dismissed → the selection is cleared.
  */
 export function useDetail() {
-  const { session } = useManagers();
+  const session = useLive()?.session ?? null;
   const navigation = useNavigation<NativeStackNavigationProp<RootStack>>();
-  const selected = useSelected();
-  const row = useRows().find((r) => r.id === selected);
+  const selected = useSelected(session);
+  const row = useRows(session).find((r) => r.id === selected);
 
   useEffect(() => {
     if (selected === null && navigation.canGoBack()) navigation.goBack();
   }, [selected, navigation]);
   useEffect(
-    () => navigation.addListener('beforeRemove', () => session.select(null)),
+    () => navigation.addListener('beforeRemove', () => session?.select(null)),
     [navigation, session],
   );
 
-  if (!row) return { friend: null, close: () => navigation.goBack() };
+  if (!row) return { friend: null, close: () => navigation.goBack(), details: () => {} };
   const known = Number.isFinite(row.distanceM);
   const movement = formatMovement(row.speedMs);
   return {
@@ -40,14 +39,7 @@ export function useDetail() {
       colour: row.colour,
       presence: row.presence,
       /** Chip text: "Live", "Active 2 min ago", "Last seen 10 min ago", "Paused sharing". */
-      status:
-        row.presence === Presence.Live
-          ? 'Live'
-          : row.presence === Presence.Recent
-            ? `Active ${formatAgo(row.silentMs)}`
-            : row.presence === Presence.Paused
-              ? presenceLabel(row.presence)
-              : `${presenceLabel(row.presence)} ${formatAgo(row.silentMs)}`,
+      status: statusText(row.presence, row.silentMs),
       updated: `Updated ${formatAgo(row.silentMs)}`,
       distance: known ? formatDistance(row.distanceM) : '—',
       direction: known ? formatDirection(row.bearingDeg) : '—',
@@ -59,5 +51,10 @@ export function useDetail() {
         : 'Location not known yet',
     },
     close: () => navigation.goBack(),
+    /** Their full page. The sheet closes first: never a sheet over a sheet. */
+    details: () => {
+      navigation.goBack();
+      navigation.navigate('Person', { key: row.key });
+    },
   };
 }

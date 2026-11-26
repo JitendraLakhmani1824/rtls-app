@@ -2,7 +2,7 @@
 
 Live location sharing for events: friends' pins and short trails on one map — smooth with hundreds of people on screen, cheap on battery. A case study (Principal Engineer, Mobile). Expo SDK 58 · React Native 0.88 (New Architecture) · TypeScript · MapLibre.
 
-**Status:** feature-complete for the brief: live map (still + gliding pins on the UI thread, trails, presence, my location), friend list and Detail sheet, demo scenario picker, sharing policy with a battery model, Low Power Mode budget. Default session: 4 friends plus you. Results in `docs/results/`.
+**Status:** feature-complete for the brief, plus an app around it: Sessions and Friends tabs, several saved sessions, invite links (`rtls://join/…`), a live map per session (still + gliding pins on the UI thread, trails, presence, my location, a camera that flies to and follows friends), friend sheet and person page, sharing policy with a battery model, Low Power Mode budget. Results in `docs/results/`.
 
 | Read                   | For                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------ |
@@ -30,11 +30,11 @@ Before touching an Expo, EAS or React Native API, check the docs for **SDK 58**:
 ## Folders
 
 ```
-src/app/          start-up wiring: container.ts (the only file that creates managers), navigation, Root
+src/app/          start-up wiring: container.ts (the only file that creates managers), navigation, linking, Root
 src/features/x/   screens: XScreen + useX (views/ and logic/ only when needed)
 src/managers/x/   talk to the outside world (map, feed, device); implement core protocols
 src/common/       ui, utils, di (ManagersProvider, useManagers), navigation route types
-src/core/         pure TypeScript: utils → models → protocols → engine, sharing
+src/core/         pure TypeScript: utils → models → protocols → engine, sessions, sharing
 src/lab/          dev-only: spike, ladder, perf recorder, battery table
 src/testing/      fakes, contract tests, createTestManagers
 ```
@@ -42,7 +42,7 @@ src/testing/      fakes, contract tests, createTestManagers
 ## Rules (each is enforced by a check — the error message tells you the fix)
 
 1. **Location data never enters React state.** Positions and trails live in `core/engine`; screens read a once-a-second snapshot via `useRows` / `useSelected` / `useConnection`.
-2. **Screens see only `{ session, MapView }`** from `useManagers()`. They never import `managers/`, `core/engine` or `core/sharing`.
+2. **Screens see only `{ sessions, live }`** from `useManagers()`: the saved book, and the open map's `{ session, MapView }`. They never import `managers/`, `core/engine`, `core/sessions` or `core/sharing`.
 3. **Features never import each other.** They navigate by route name.
 4. **Import another folder only through its `index.ts`.** See `docs/import-rules.md`.
 5. **`core` is pure TypeScript:** no React, React Native or Expo. Time comes from `Clock`, randomness from the seeded `Rng` — `Date.now()` and `Math.random()` are lint errors in `core` and `common`.
@@ -54,7 +54,7 @@ src/testing/      fakes, contract tests, createTestManagers
 
 ## Recipes
 
-**Add a screen:** `src/features/x/` with `XScreen.tsx` + `useX.ts` + `index.ts` → add the route type in `src/common/navigation/routes.ts` → register it in `src/app/navigation.tsx` → test `useX` with `renderHook` + `createTestManagers()`.
+**Add a screen:** `src/features/x/` with `XScreen.tsx` + `useX.ts` + `index.ts` → add the route type in `src/common/navigation/routes.ts` → register it in `src/app/navigation.tsx` (and `src/app/linking.ts` if a link opens it) → test `useX` with `renderHook` + `createTestManagers()`.
 
 **Add a manager:** protocol in `src/core/protocols` (doc comment stating its promises) → implementation in `src/managers/x/` → fake in `src/testing/fakes` → contract test both pass → one line in `src/app/container.ts`. Or use the `new-manager` skill.
 

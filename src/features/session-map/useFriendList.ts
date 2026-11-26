@@ -1,6 +1,7 @@
-import { useManagers, useRows } from '@common/di';
+import { useRows } from '@common/di';
 import { formatAgo, formatDirection, formatDistance, formatMovement } from '@common/utils';
 import { Presence, type FriendRow } from '@core/models';
+import type { Session } from '@core/protocols';
 
 export type FriendItem = {
   id: number;
@@ -18,9 +19,8 @@ export type FriendItem = {
 };
 
 /** The friend list: mounted only while the panel is open. */
-export function useFriendList() {
-  const { session } = useManagers();
-  const rows = useRows();
+export function useFriendList(session: Session) {
+  const rows = useRows(session);
   return { items: rows.map(toItem), select: (id: number) => session.select(id) };
 }
 

@@ -1,4 +1,10 @@
-import { FIX_STRIDE, PRESENCE_STRIDE, type FixBatch, type PresenceBatch } from '@core/models';
+import {
+  FIX_STRIDE,
+  PRESENCE_STRIDE,
+  type FixBatch,
+  type Member,
+  type PresenceBatch,
+} from '@core/models';
 import type { FeedSink } from '@core/protocols';
 import { feedContract } from '@testing/contracts';
 import { FakeClock } from '@testing/fakes';
@@ -131,5 +137,41 @@ describe('SyntheticFeedManager', () => {
     clock.advance(60_000);
     feed.start(sink(), cursor).stop();
     expect(snapshots[1]?.[2]).not.toBe(snapshots[0]?.[2]);
+  });
+
+  describe('a session’s people', () => {
+    const people = ['Asha', 'Riya', 'Dev Patel', 'Sam'].map((name) => ({
+      key: name.toLowerCase(),
+      name,
+    }));
+    const membersOf = (meIndex: number) => {
+      let members: Member[] = [];
+      new SyntheticFeedManager({ ...options('trip', 4), people, meIndex }, new FakeClock()).start({
+        onMembers: (m) => (members = m),
+        onFixes: () => {},
+        onPresence: () => {},
+        onState: () => {},
+        onSessionEnded: () => {},
+      });
+      return members;
+    };
+
+    it('names members after the people, with me as "You"', () => {
+      const members = membersOf(1);
+      expect(members.map((m) => [m.key, m.name, m.initials, m.isMe])).toEqual([
+        ['asha', 'Asha', 'A', false],
+        ['riya', 'You', 'ME', true],
+        ['dev patel', 'Dev Patel', 'DP', false],
+        ['sam', 'Sam', 'S', false],
+      ]);
+    });
+
+    it('moves the crowd the same whoever is me, so phones that joined one link agree', () => {
+      const positions = (meIndex: number) =>
+        run({ ...options('trip', 4), people, meIndex }, 10_000).fixes.filter(
+          (f) => f[0] !== 0 && f[0] !== 2,
+        );
+      expect(positions(2)).toEqual(positions(0));
+    });
   });
 });

@@ -1,11 +1,17 @@
 // Interfaces at the boundaries — only where an implementation is swapped or faked.
 // Each states its promises; fakes in src/testing/fakes keep them too.
 import type {
+  CameraMove,
+  Circle,
   ConnState,
   Cursor,
+  EventKind,
   FriendRow,
   FixBatch,
+  Invite,
   Member,
+  Person,
+  SessionRecord,
   MotionFrame,
   PinFrame,
   PresenceBatch,
@@ -41,6 +47,8 @@ export type Power = {
   lowPowerMode: boolean;
   thermal: 'nominal' | 'fair' | 'serious' | 'critical';
   battery: number;
+  /** The user asked the phone for less motion (accessibility): no flying, tilting or rotating camera. */
+  reduceMotion: boolean;
 };
 
 export interface DeviceManager {
@@ -90,13 +98,22 @@ export interface MapManager {
   /** Every trail to draw (replaces the previous frame). */
   setTrails(frame: TrailFrame): void;
   setSelected(member: number | null): void;
-  /** Animates the camera to show these bounds (degrees), leaving room for the app's controls. */
-  fitTo(west: number, south: number, east: number, north: number): void;
+  /**
+   * Animates the camera to show these bounds (degrees), flat and north up, leaving room for the
+   * app's controls. Default: a short ease.
+   */
+  fitTo(
+    west: number,
+    south: number,
+    east: number,
+    north: number,
+    how?: { ms: number; path: 'fly' | 'ease' },
+  ): void;
   /**
    * Animates the camera to centre on a point, in the part of the map not covered by the app's
-   * controls; zooms to `zoom` if given.
+   * controls. A new move replaces one still running. Animated by the map itself: no JS per frame.
    */
-  centerOn(lng: number, lat: number, zoom?: number): void;
+  moveCamera(move: CameraMove): void;
   /** Most gliding updates per second the map should draw; 0 = no gliding. */
   setFrameRateCap(fps: number): void;
   onPinPress(listener: (member: number) => void): Stop;
@@ -108,8 +125,6 @@ export interface Session {
   /** What this session is, for the screen title, e.g. "Concert at BKC". */
   readonly title: string;
   select(member: number | null): void;
-  /** Leaves the session: the app stops it and returns to the start page. */
-  leave(): void;
   selected: Readable<number | null>;
   connection: Readable<ConnState>;
   /**
@@ -117,6 +132,44 @@ export interface Session {
    * subscribes; unchanged otherwise.
    */
   rows: Readable<FriendRow[]>;
+}
+
+/**
+ * Your people and sessions, kept on the phone. Changes apply at once in memory and are saved in
+ * the background; a failed save never breaks the app.
+ */
+export interface Sessions {
+  /** False until the saved book has been read. */
+  readonly loaded: Readable<boolean>;
+  /** Everyone you know, by name. Never includes you. */
+  readonly people: Readable<Person[]>;
+  /** Your sessions, newest first. */
+  readonly list: Readable<SessionRecord[]>;
+  /** Your name, as invites show it ('' until you set it). */
+  readonly myName: Readable<string>;
+  get(id: string): SessionRecord | undefined;
+  /** Starts a session with you and these people (keys from `people`). */
+  create(input: { title: string; event: EventKind; people: string[] }): SessionRecord;
+  /** Reads an invite link's parts (path code + query); null if the link is broken. */
+  readInvite(parts: Partial<Record<'code' | 'e' | 't' | 'p' | 'f', string>>): Invite | null;
+  /**
+   * Joins as `as` (an index into invite.names). People you don't know yet are added to Friends.
+   * Joining a session you already have returns it unchanged.
+   */
+  join(invite: Invite, as: number): SessionRecord;
+  remove(id: string): void;
+  addPerson(name: string, circle: Circle): Person;
+  setMyName(name: string): void;
+  /** The link that invites someone into this session. */
+  inviteUrl(id: string): string;
+}
+
+// ── Storage ──────────────────────────────────────────────────────────────────────
+
+/** Text saved on the phone. Never throws: unreadable storage reads as null, a failed save is lost. */
+export interface Storage {
+  load(key: string): Promise<string | null>;
+  save(key: string, value: string): Promise<void>;
 }
 
 // ── Measurement (no-op in production) ───────────────────────────────────────────

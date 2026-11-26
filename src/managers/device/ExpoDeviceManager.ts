@@ -1,7 +1,7 @@
 import type { DeviceManager, FrameScheduler, Power, Readable, Stop } from '@core/protocols';
 import { createStore } from '@core/utils';
 import * as Battery from 'expo-battery';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AccessibilityInfo, AppState, type AppStateStatus } from 'react-native';
 
 import { systemClock } from './systemClock';
 
@@ -20,7 +20,7 @@ const isForeground = (state: AppStateStatus | string | null | undefined) => stat
 
 /**
  * Real clock, screen-refresh ticks, app foreground state, and power: Low Power Mode and battery
- * level from expo-battery. Heat stays 'nominal' (reading it needs a small native module, design §2.8).
+ * level from expo-battery, Reduce Motion from the accessibility settings. Heat stays 'nominal' (reading it needs a small native module, design §2.8).
  */
 export class ExpoDeviceManager implements DeviceManager {
   readonly clock = systemClock;
@@ -29,6 +29,7 @@ export class ExpoDeviceManager implements DeviceManager {
     lowPowerMode: false,
     thermal: 'nominal',
     battery: 1,
+    reduceMotion: false,
   });
   readonly power: Readable<Power> = this.powerStore;
   private readonly foregroundStore = createStore(isForeground(AppState.currentState));
@@ -43,6 +44,9 @@ export class ExpoDeviceManager implements DeviceManager {
       Battery.addBatteryLevelListener(({ batteryLevel }) =>
         this.setPower({ battery: level(batteryLevel) }),
       ),
+      AccessibilityInfo.addEventListener('reduceMotionChanged', (reduceMotion) =>
+        this.setPower({ reduceMotion }),
+      ),
     ];
     let stopped = false;
     void Battery.getPowerStateAsync()
@@ -51,6 +55,11 @@ export class ExpoDeviceManager implements DeviceManager {
           this.setPower({ lowPowerMode: state.lowPowerMode, battery: level(state.batteryLevel) });
       })
       .catch(() => {}); // no battery info (some simulators): keep the defaults
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduceMotion) => {
+        if (!stopped) this.setPower({ reduceMotion });
+      })
+      .catch(() => {});
     return () => {
       stopped = true;
       subscriptions.forEach((s) => s.remove());
@@ -61,7 +70,11 @@ export class ExpoDeviceManager implements DeviceManager {
     const next = { ...this.powerStore.get(), ...change };
     const prev = this.powerStore.get();
     // Only a real change reaches the session (a new budget re-plans gliding).
-    if (next.lowPowerMode !== prev.lowPowerMode || next.battery !== prev.battery)
+    if (
+      next.lowPowerMode !== prev.lowPowerMode ||
+      next.battery !== prev.battery ||
+      next.reduceMotion !== prev.reduceMotion
+    )
       this.powerStore.set(next);
   }
 }

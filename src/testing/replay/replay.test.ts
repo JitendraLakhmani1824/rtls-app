@@ -47,7 +47,7 @@ function replay(scenario: ScenarioName) {
   device.clock.advance(10_000);
   map.pressPin(1);
   device.clock.advance(20_000);
-  device.power.set({ lowPowerMode: true, thermal: 'nominal', battery: 0.15 });
+  device.power.set({ lowPowerMode: true, thermal: 'nominal', battery: 0.15, reduceMotion: false });
   device.clock.advance(30_000);
 
   const sent = JSON.stringify(

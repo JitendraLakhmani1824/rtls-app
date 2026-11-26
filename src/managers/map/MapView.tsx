@@ -37,7 +37,8 @@ const CLUSTER_MAX_ZOOM = 15;
 const PIN_GROUP_RADIUS = 20;
 /** Room for the app's controls when fitting friends into view: the badge on top, panel and sheet below. */
 const CAMERA_PADDING = { top: 120, right: 48, bottom: 260, left: 48 };
-const CAMERA_MS = 600;
+/** Following a friend: keep them centred in the part of the map above the friend sheet. */
+const FOLLOW_PADDING = { top: 0, right: 0, bottom: 240, left: 0 };
 /** The selection ripple's length; it plays once. */
 const RIPPLE_MS = 900;
 const INK = '#0f172a';
@@ -75,17 +76,28 @@ function MapLibreView({ model }: { model: MapViewModel }) {
   useEffect(() => {
     const camera = cameraRef.current;
     if (!camera || !command) return;
+    // The map animates each move natively; a new move replaces one still running.
     if (command.kind === 'fit') {
-      camera.fitBounds(command.bounds, { padding: CAMERA_PADDING, duration: CAMERA_MS });
-    } else {
-      // Centred in the part of the map above the friend sheet.
-      camera.easeTo({
-        center: command.center,
-        zoom: command.zoom,
-        padding: { top: 0, right: 0, bottom: 240, left: 0 },
-        duration: CAMERA_MS,
+      camera.fitBounds(command.bounds, {
+        padding: CAMERA_PADDING,
+        pitch: 0,
+        bearing: 0,
+        duration: command.ms,
+        easing: command.path,
       });
+      return;
     }
+    const { lng, lat, zoom, pitch, bearing, ms, path } = command.move;
+    const target = {
+      center: [lng, lat] as [number, number],
+      padding: FOLLOW_PADDING,
+      duration: ms,
+      ...(zoom === undefined ? {} : { zoom }),
+      ...(pitch === undefined ? {} : { pitch }),
+      ...(bearing === undefined ? {} : { bearing }),
+    };
+    if (path === 'fly') camera.flyTo(target);
+    else camera.easeTo({ ...target, easing: path });
   }, [command]);
 
   const onRegion = (gesturing: boolean) => (e: { nativeEvent: ViewStateChangeEvent }) => {
@@ -160,6 +172,7 @@ function MePin({ model }: { model: MapViewModel }) {
         filter={['has', 'h']}
         paint={{
           'circle-radius': METRES_RADIUS,
+          'circle-pitch-alignment': 'map', // a metre-true circle lies on the ground when tilted
           'circle-color': ME_BLUE,
           'circle-opacity': 0.1,
           'circle-stroke-color': ME_BLUE,
@@ -281,6 +294,7 @@ function StillPins({
         filter={['all', ['!', ['has', 'point_count']], ['has', 'h']]}
         paint={{
           'circle-radius': METRES_RADIUS,
+          'circle-pitch-alignment': 'map', // a metre-true circle lies on the ground when tilted
           'circle-color': ['get', 'c'],
           'circle-opacity': 0.12,
           'circle-stroke-color': ['get', 'c'],
@@ -443,6 +457,7 @@ function GlidingPins({ model }: { model: MapViewModel }) {
           filter={['has', 'h']}
           paint={{
             'circle-radius': METRES_RADIUS,
+            'circle-pitch-alignment': 'map', // a metre-true circle lies on the ground when tilted
             'circle-color': ['get', 'c'],
             'circle-opacity': 0.12,
             'circle-stroke-color': ['get', 'c'],

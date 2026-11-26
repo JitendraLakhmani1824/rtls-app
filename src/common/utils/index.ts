@@ -4,5 +4,9 @@ export {
   formatDirection,
   formatDistance,
   formatMovement,
+  formatPeople,
+  formatSpeed,
+  inviteMessage,
   presenceLabel,
+  statusText,
 } from './format';

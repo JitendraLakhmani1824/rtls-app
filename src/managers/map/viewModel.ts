@@ -1,4 +1,4 @@
-import type { Viewport } from '@core/models';
+import type { CameraMove, Viewport } from '@core/models';
 import type { Store } from '@core/utils';
 import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import type { SharedValue } from 'react-native-reanimated';
@@ -12,8 +12,14 @@ export type MotionInput = { version: number; entries: number[] };
 export type MemberTable = { colours: string[]; initials: string[]; names: string[] };
 /** A camera move asked for by the session; `seq` makes a repeated request a new value. */
 export type CameraCommand =
-  | { seq: number; kind: 'fit'; bounds: [west: number, south: number, east: number, north: number] }
-  | { seq: number; kind: 'center'; center: [lng: number, lat: number]; zoom?: number };
+  | {
+      seq: number;
+      kind: 'fit';
+      bounds: [west: number, south: number, east: number, north: number];
+      ms: number;
+      path: 'fly' | 'ease';
+    }
+  | { seq: number; kind: 'move'; move: CameraMove };
 
 /** Where the selected friend's drawn trail ends; the worklet joins it to the gliding pin. */
 export type TrailTip = { version: number; lng: number; lat: number };

@@ -19,6 +19,9 @@ export const colors = {
   danger: '#dc2626',
   dangerSoft: '#fee2e2',
   accent: '#2563eb',
+  accentSoft: '#dbeafe',
+  /** Screen background behind cards. */
+  page: '#f8fafc',
 } as const;
 
 export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 } as const;

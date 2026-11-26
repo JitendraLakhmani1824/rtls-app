@@ -1,4 +1,4 @@
-import type { SessionProfile } from '@core/models';
+import type { EventKind, SessionProfile } from '@core/models';
 import type { Rng } from '@core/utils';
 
 /** Simulated people. Positions are metres east (x) / north (y) of the scenario centre. */
@@ -10,7 +10,7 @@ export interface World {
   step(rng: Rng, seconds: number): void;
 }
 
-export type ScenarioName = 'concert' | 'marathon' | 'trip';
+export type ScenarioName = EventKind;
 
 export type Scenario = {
   /** Shown as the session's title. */

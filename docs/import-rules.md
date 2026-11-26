@@ -17,10 +17,11 @@ An import is allowed only if one of these rules allows it. Anything else fails `
 | `managers-core` | managers/* may import core/protocols, core/models and core/utils. |
 | `managers-map-libraries` | managers/map is the only folder that may import MapLibre (plus React, React Native, Reanimated and the bundled map style). |
 | `managers-device-libraries` | managers/device is the only folder that may import expo-battery and modules/rtls-thermal (plus React Native). |
+| `managers-storage-libraries` | managers/storage is the only folder that may import AsyncStorage. |
 | `common-core` | common/* may import core/protocols, core/models and core/utils. |
 | `common-ui-utils` | common/ui may import common/utils. |
-| `common-libraries` | common/* may import React, React Native and React Navigation types. |
-| `core-engine-sharing` | core/engine and core/sharing may import core/protocols, core/models and core/utils; only app/, lab/ and testing/ may import them. |
+| `common-libraries` | common/* may import React, React Native, React Navigation types and safe-area. |
+| `core-engine-sharing-sessions` | core/engine, core/sharing and core/sessions may import core/protocols, core/models and core/utils; only app/, lab/ and testing/ may import them. |
 | `core-protocols` | core/protocols may import core/models and core/utils. |
 | `core-models` | core/models may import core/utils. core/utils imports nothing. |
 

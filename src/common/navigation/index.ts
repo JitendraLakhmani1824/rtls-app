@@ -1,1 +1,1 @@
-export type { RootStack } from './routes';
+export type { RootStack, TabsParams } from './routes';

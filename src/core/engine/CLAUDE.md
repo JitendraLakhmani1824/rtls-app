@@ -3,7 +3,7 @@
 Turns location fixes into what the map draws. Pure TypeScript.
 
 **Start with:** `LiveSession.ts` (the controller) → `presenter.ts` (who is on screen, who glides, what each frame holds) → `store.ts` (latest position and presence per member) → `trails.ts` (recent path per member).
-Small pure helpers: `presence.ts` (Live / Recent / Stale), `budget.ts` (power → animation budget), `throttle.ts`.
+Small pure helpers: `presence.ts` (Live / Recent / Stale), `budget.ts` (power → animation budget), `throttle.ts`. `camera.ts` decides camera moves (fit, fly to, follow with tilt, calm mode).
 
 **Invariants**
 

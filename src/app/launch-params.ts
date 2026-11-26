@@ -82,23 +82,16 @@ export const isScenarioLink = (url: string | null | undefined) =>
 export type Launch = {
   /** False until the link that opened the app (if any) has been read. */
   ready: boolean;
-  /** The session to show, or null for the start page. */
+  /** The scenario a link asked for, or null for the app itself. */
   params: LaunchParams | null;
-  /** From the start page: open the map with these parameters. */
-  start(params: LaunchParams): void;
-  /** Leave the session: back to the start page. */
-  exit(): void;
 };
 
 /**
- * What to show: the start page, or a session. A scenario link (at launch or later) opens a session
- * directly; the start page opens one with the user's choices; leaving returns to the start page.
+ * A scenario link (at launch or later) opens that scenario's map directly, for measurement.
+ * Every other link (join, session) is React Navigation's.
  */
 export function useLaunch(): Launch {
-  const [state, setState] = useState<{ ready: boolean; params: LaunchParams | null }>({
-    ready: false,
-    params: null,
-  });
+  const [state, setState] = useState<Launch>({ ready: false, params: null });
   useEffect(() => {
     let cancelled = false;
     void Linking.getInitialURL().then((url) => {
@@ -117,9 +110,5 @@ export function useLaunch(): Launch {
       subscription.remove();
     };
   }, []);
-  return {
-    ...state,
-    start: (params) => setState({ ready: true, params }),
-    exit: () => setState({ ready: true, params: null }),
-  };
+  return state;
 }

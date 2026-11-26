@@ -7,7 +7,12 @@ import { FakeClock } from './FakeClock';
 export class FakeDeviceManager implements DeviceManager {
   readonly clock: FakeClock;
   readonly foreground = createStore(true);
-  readonly power = createStore<Power>({ lowPowerMode: false, thermal: 'nominal', battery: 1 });
+  readonly power = createStore<Power>({
+    lowPowerMode: false,
+    thermal: 'nominal',
+    battery: 1,
+    reduceMotion: false,
+  });
   private frameListeners = new Set<() => void>();
   readonly frames: FrameScheduler = {
     start: (cb): Stop => {

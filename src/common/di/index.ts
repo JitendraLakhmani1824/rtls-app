@@ -1,8 +1,15 @@
 export {
   ManagersProvider,
   useConnection,
+  useLive,
+  useLiveRow,
   useManagers,
+  useMyName,
+  usePeople,
   useRows,
   useSelected,
+  useSessionList,
+  type LiveSessions,
+  type LiveView,
   type Screens,
 } from './ManagersProvider';

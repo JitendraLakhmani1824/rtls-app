@@ -248,24 +248,31 @@ How the app works inside. Everything here is built, except §2.7's sharing phone
 
 ```
 src/
-├── app/            start-up wiring: container.ts · launch-params.ts · navigation.tsx · Root.tsx
+├── app/            start-up wiring: container.ts · launch-params.ts · linking.ts · navigation.tsx · Root.tsx
 ├── features/
-│   ├── home/       HomeScreen · useHome           (live map + friend list panel)
-│   └── detail/     DetailSheet · useDetail        (one friend, native form sheet)
+│   ├── sessions/   your sessions (tab)
+│   ├── friends/    everyone you know, your name (tab)
+│   ├── new-session/  event, name, who's coming
+│   ├── join/       an invite link: "which one are you?"
+│   ├── session-map/  one session's live map + friend list panel
+│   ├── detail/     the selected friend (native form sheet)
+│   └── person/     one person's page
 ├── managers/       talk to the outside world, implement core protocols
 │   ├── map/        MapLibreManager · MapView · layers · encode
 │   ├── feed/       SyntheticFeedManager · scenarios/ · tracks · withFaults
-│   └── device/     ExpoDeviceManager: clock · frames · visibility · power
+│   ├── device/     ExpoDeviceManager: clock · frames · visibility · power · Reduce Motion
+│   └── storage/    AsyncStorageManager
 ├── common/
 │   ├── ui/         theme · Button · Badge · Avatar · Panel · ErrorBoundary
 │   ├── utils/      distance / direction / "10 s ago" text
-│   ├── di/         ManagersProvider · useManagers() · useRows / useSelected / useConnection
+│   ├── di/         ManagersProvider · useManagers() · useLive · useRows / useSelected / useConnection · useSessionList / usePeople
 │   └── navigation/ routes.ts (RootStack types)
 ├── core/
 │   ├── utils/      geo · interpolate · ring buffer · seeded Rng
 │   ├── models/     Member · Viewport · ConnState · frame layouts
 │   ├── protocols/  every interface in §2.2
-│   ├── engine/     LiveSession · store · trails · presence · presenter · budget
+│   ├── engine/     LiveSession · store · trails · presence · presenter · budget · camera
+│   ├── sessions/   SessionBook (people + sessions, saved) · invite links
 │   └── sharing/    SharingPolicy · radio model · simulated GPS + uplink
 ├── lab/            dev only: ladder rungs · PerfRecorder + overlay · battery table
 └── testing/        fakes · contract tests · createTestManagers
@@ -292,8 +299,8 @@ flowchart TB
 Enforced by a dependency-cruiser allow-list; the generated table is `docs/import-rules.md`. In short:
 
 - `features` and `managers` see only `core/protocols`, `core/models`, `core/utils` (plus `common` for features).
-- `core/engine` and `core/sharing` are imported only by `app`, `lab` and `testing`.
-- MapLibre is imported only in `managers/map`; `expo-battery` and the native module only in `managers/device`.
+- `core/engine`, `core/sessions` and `core/sharing` are imported only by `app`, `lab` and `testing`.
+- MapLibre is imported only in `managers/map`; `expo-battery` and the native module only in `managers/device`; AsyncStorage only in `managers/storage`.
 - No cycles; imports go through each folder's `index.ts`; features never import each other; `core` never imports React, React Native or Expo; no `Date.now()` / `Math.random()` in `core` and `common` (use `Clock` and `Rng`).
 
 ### Dependency injection
@@ -302,24 +309,24 @@ Pure DI: constructor injection typed as protocols; no container library.
 
 ```ts
 // app/container.ts — the only file that names implementations
-export function createContainer(p: LaunchParams) {
-  const device  = new ExpoDeviceManager()
-  const feed    = withFaults(new SyntheticFeedManager(p.scenario, device.clock, seededRng(p.seed)), p.faults)
-  const map     = new MapLibreManager()
-  const perf    = p.perf ? new PerfRecorder(device.clock) : noopPerf
-  const session = new LiveSession({ feed, map, device, perf })
-  return {
-    screens: { session, MapView: map.MapView },   // all that screens ever see
-    start: () => session.start(),                 // returns stop(); called from Root's effect
+export function createApp() {
+  const device   = new ExpoDeviceManager()
+  const sessions = new SessionBook({ storage: new AsyncStorageManager(), clock: device.clock, rng })
+  const live: LiveSessions = {
+    view(id)  { /* first use: feed + MapLibreManager + LiveSession for that saved session */ },
+    open(id)  { /* stop the running session, start this one, current = it */ },
+    close(id) { /* stop it if it's running */ },
+    current,  // Readable<{ id, session, MapView } | null>
   }
+  return { screens: { sessions, live }, start: () => { device.watch(); sessions.load() } }
 }
 
 // app/Root.tsx
-useEffect(() => container.start(), [])           // restartable, so React's dev double-mount is safe
-<ManagersProvider value={container.screens}>…</ManagersProvider>
+useEffect(() => app.start(), [app])               // restartable, so React's dev double-mount is safe
+<ManagersProvider value={app.screens}>…</ManagersProvider>
 ```
 
-`useManagers()` returns `{ session: Session; MapView: ComponentType }` — screens cannot reach the feed, the device or the map manager. Tests build the same shape with `createTestManagers(overrides)`.
+`useManagers()` returns `{ sessions: Sessions; live: LiveSessions }` — screens cannot reach the feed, the device, storage or the map manager. **Only one session runs at a time**: the one whose map is open. Its engine is built on first open, kept, and paused when the map closes. Tests build the same shape with `createTestManagers()` (a real `SessionBook` over memory storage, a fake live session).
 
 ## 2.2 Protocols
 
@@ -332,7 +339,7 @@ interface Readable<T> { get(): T; subscribe(cb: () => void): Stop }
 // Time and device
 interface Clock          { now(): number; every(ms: number, cb: () => void): Stop; after(ms: number, cb: () => void): Stop }
 interface FrameScheduler { start(cb: () => void): Stop }          // screen-refresh ticks; time comes from Clock
-type Power = { lowPowerMode: boolean; thermal: 'nominal' | 'fair' | 'serious' | 'critical'; battery: number }
+type Power = { lowPowerMode: boolean; thermal: 'nominal' | 'fair' | 'serious' | 'critical'; battery: number; reduceMotion: boolean }
 interface DeviceManager  { clock: Clock; frames: FrameScheduler
                            foreground: Readable<boolean>           // app state only — never navigation focus
                            power: Readable<Power> }
@@ -344,16 +351,21 @@ interface FeedSink       { onMembers(m: Member[]): void; onFixes(b: FixBatch): v
 interface FeedHandle     { setViewport(v: Viewport): void; cursor(): Cursor; stop(): void }
 
 // Map
-interface MapCamera      { fitBounds(b: Bounds, ms: number): void; centerOn(lng: number, lat: number, ms: number): void }
-interface MapManager     { ready: Readable<boolean>; viewport: Readable<Viewport>; camera: MapCamera
+type CameraMove = { lng: number; lat: number; zoom?: number; pitch?: number; bearing?: number; ms: number; path: 'fly' | 'ease' | 'linear' }
+interface MapManager     { ready: Readable<boolean>; viewport: Readable<Viewport>
+                           fitTo(w, s, e, n, how?: { ms: number; path: 'fly' | 'ease' }): void; moveCamera(m: CameraMove): void
                            setMembers(m: Member[]): void; setStill(f: PinFrame): void; setMoving(f: MotionFrame): void
                            setTrails(t: TrailFrame): void; setSelected(id: number | null): void
                            setFrameRateCap(fps: number): void; frame?(nowMs: number): boolean   // false = no glide left
                            onPinPress(cb: (id: number) => void): Stop }
 
 // What screens see of the engine
-interface Session        { select(id: number | null): void; setCameraMode(m: CameraMode): void
-                           rows: Readable<Row[]>; selected: Readable<Card | null>; connection: Readable<ConnState> }
+interface Session        { title: string; select(id: number | null): void
+                           rows: Readable<FriendRow[]>; selected: Readable<number | null>; connection: Readable<ConnState> }
+interface Sessions       { loaded, people, list, myName: Readable<…>; get(id); create({ title, event, people })
+                           readInvite(parts): Invite | null; join(invite, as); remove(id); addPerson(name, circle)
+                           setMyName(name); inviteUrl(id) }                  // saved in the background
+interface Storage        { load(key): Promise<string | null>; save(key, value): Promise<void> }   // never throws
 interface Perf           { time(name: string, ms: number): void; count(name: string): void }
 
 // Sharing phone (design; simulated in core/sharing)
@@ -467,9 +479,19 @@ stateDiagram-v2
   - `onState` → publish `connection` immediately.
   - `onSessionEnded` → stop and show "Session ended".
 - **Pin taps.** The session listens to `map.onPinPress` and calls `select(id)`. Screens only react to `selected`.
-- **Camera:** *fit* frames every friend at start, and again when someone leaves the view. Selecting a friend switches to *follow*: zoom in to at least 16 and re-centre when they move 15% of the view. Any user gesture switches to *free*. No camera buttons.
+- **Camera:** `CameraDirector` (below) decides; `LiveSession` calls it on select, on each batch that moved the followed friend, and on the tick.
 - **Grouping:** only for sessions over 30 friends. A group of friends always shows every friend, and they may glide at any zoom.
 - **Lazy snapshot.** `rows`, `selected` and `connection` are separate readables. `rows` is computed at most once per tick, only when read, and subscribers hear about it only while subscribed.
+
+### Camera (`camera.ts`)
+
+Every move is one `MapManager.moveCamera` / `fitTo` call; MapLibre animates it natively (no JavaScript per frame).
+
+- **fit:** frames everyone when the session starts, and again only when someone leaves the view. A new map opens over the city (zoom 11) and **flies in** (1.8 s); afterwards fits ease. Scenario links skip the intro.
+- **follow:** selecting a friend **flies** to them (zoom ≥ 16, 1.2 s). Then each new fix sends a **linear** move with the same target and duration as their gliding pin, so pin and camera travel together. Faster than 2 m/s the map **tilts to 45° and turns to their direction of travel** (only when it changes by > 15°, so GPS wobble doesn't rotate it); slower than 0.5 m/s, or when the sheet closes, it levels to flat, north up.
+- **free:** after any gesture the camera is the user's.
+- **Calm** (Low Power Mode or Reduce Motion): short eases, no tilt or rotation, no intro, re-centre only when the friend has moved 15% of the view.
+- Accuracy halos use `circle-pitch-alignment: 'map'`, so a metre-true circle lies on the ground when tilted.
 
 ## 2.5 Map (`managers/map`)
 
@@ -511,8 +533,12 @@ stateDiagram-v2
 - **Shape:** `XScreen` wires `useX()` to views. `useX` is the only file that uses `useManagers()` and navigation, and returns data + actions. Function components only; the one class is `ErrorBoundary`.
 - **Snapshot hooks:** `useRows()`, `useSelected()`, `useConnection()` — `useSyncExternalStore` over the session's readables. Nothing subscribes to per-frame data. The friend list mounts only when the panel is expanded, so collapsed means `rows` is never computed.
 - **Text:** the snapshot carries distance and bearing from me, and age, as numbers; rows arrive sorted by distance. `common/utils` formats "350 m NE" and "updated 10 s ago".
-- **Start:** the first page (outside any session): event (concert / marathon / road trip) and number of friends, 1–20, then "Open live map". `app/Root` builds the session from the choice; a scenario link skips the page.
-- **Home:** full-screen `MapView`; a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05") and a Leave button (`session.leave()` → back to Start); the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`, which centres the friend above the sheet. When `selected` becomes non-null, `useHome` navigates to `Friend` and hides the panel: one bottom surface at a time.
+- **Navigation:** two tabs (Sessions, Friends) inside a native stack. A session's map, a person's page, New session and Join open over the tabs, full screen; the friend sheet is a form sheet over the map.
+- **Sessions and people** (`core/sessions/SessionBook`): saved on the phone (`Storage` → AsyncStorage), one JSON document, versioned; entries that don't parse are dropped one by one, unreadable data falls back to a sample book (family, friends, one session of each event). Changes apply in memory at once and are saved in order in the background.
+- **Invite links:** `rtls://join/K7Q2XP?e=marathon&t=City%20Marathon&p=Asha,Riya,Arjun&f=0` — code, event, title, everyone in order, who sent it. Without a server the link *is* the session: the code seeds the simulation and the order is kept, so every phone that joins simulates the same people and routes (live positions only roughly agree, since each phone runs its own clock). Joining asks "which one are you?"; people are matched to your list by name. `rtls://session/<id>` opens a map. A real app would use https app links on the server's domain.
+- **Sessions tab:** cards (event, title, faces, count); tap opens the map; ••• or long-press: invite, leave.
+- **Friends tab:** your name (shown on invites), then Family and Friends; add a person.
+- **Session map:** full-screen `MapView`; Back, a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05"), Invite (share sheet); the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`. When `selected` becomes non-null, `useSessionMap` navigates to `Friend` and hides the panel: one bottom surface at a time. Opened with `focus` (from a person's page), it selects that person once the map has them.
 - **Markers:** friends are initials in their colour with a white ring and shadow; Recent fades, Stale turns grey; names show from zoom 16. The selected friend gets a soft glow, a white ring in their colour, their name, and a one-off ripple (no endless animation). Me is a blue dot with a halo in its own source: never grouped, above every still friend (the selected friend draws above it, so its name stays readable).
 - **Detail:** React Navigation native-stack screen `Friend`:
   - `presentation: 'formSheet'`;
@@ -520,9 +546,9 @@ stateDiagram-v2
   - `sheetLargestUndimmedDetentIndex` set, so the map stays undimmed and touchable;
   - `contentStyle.backgroundColor` set.
 
-  It shows a status chip, distance, a direction arrow, movement and "updated … ago". `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
-- **Fallback:** if the M0 sheet check fails on Android, the detail card renders inside Home's panel.
-- **Launch parameters:** `app/launch-params.ts` reads a deep link (`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&rung=D&faults=drops,jumps`) or the dev scenario picker and builds the container from it. The ladder rung is fixed at launch, so production code never checks it.
+  It shows a status chip, distance, a direction arrow, movement and "updated … ago", and **View details**, which closes the sheet and then pushes the person's page. `useDetail` closes the sheet when `selected` becomes null; dismissing the sheet calls `session.select(null)`. The route has no params: selection lives only in the session. `enableFreeze()` is never called, so the map keeps drawing under the sheet.
+- **Person:** avatar and circle; while they're on the open map, live tiles (distance, direction, speed, distance covered) and Show on map; the sessions you share (each opens its map focused on them); Start a session with them.
+- **Launch parameters:** `app/launch-params.ts` reads a scenario link (`rtls://scenario?name=marathon&friends=500&interval=1000&seed=42&rung=D&faults=drops,jumps`) and opens that scenario's map directly, unsaved, for measurement. The ladder rung is fixed at launch, so production code never checks it.
 - **Layout:** portrait only. Layout reads window size, never screen size.
 
 ## 2.7 Battery on the phone
@@ -532,7 +558,7 @@ stateDiagram-v2
 - App in the background → Paused: no feed, no ticks, no frames.
 - Nothing gliding → no frame loop. No perpetual animations (no pulsing rings, no heading puck).
 - Speed-based glide budget and frame cap (§2.4); smaller budget under Low Power Mode or heat.
-- Camera modes with hysteresis, so fit and follow don't animate continuously.
+- Camera moves are native animations: one call per fix while following, none otherwise.
 - The friend list is only computed while it's on screen.
 
 ### Sharing phone (designed; simulated in `core/sharing`)
@@ -582,7 +608,7 @@ stateDiagram-v2
 | Contract | Feed, session, clock: the real class and its fake pass the same tests (e.g. per-member order, nothing after `stop()`, resume from cursor) | `testing/contracts/*` |
 | Lifecycle | Background / foreground, map lost / ready, start → stop → start → feed stopped, cursor kept, everything re-sent | Fake device and map |
 | Replay | Seed 42 → 60 virtual seconds → the fingerprint of everything sent to the map matches the saved one | Fake clock, manual frames |
-| Screen hooks | `useHome`, `useDetail` with `createTestManagers()` and a stub navigation object | `renderHook` |
+| Screen hooks | `useSessions`, `useNewSession`, `useJoin`, `useSessionMap`, `useDetail`, `useFriends`, `usePerson` with `createTestManagers()` and a stub navigation object | `renderHook` |
 | Device | `run-scenario` screenshots; the measurement runs | Release build, Android phone |
 
 ## 2.10 Performance results

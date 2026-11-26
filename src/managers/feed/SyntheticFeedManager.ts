@@ -7,14 +7,21 @@ import {
   type PresenceBatch,
 } from '@core/models';
 import type { Clock, FeedHandle, FeedManager, FeedSink, Stop } from '@core/protocols';
-import { createRng, offsetMeters, type Rng } from '@core/utils';
+import { colourFor, createRng, initialsOf, offsetMeters, PALETTE, type Rng } from '@core/utils';
 
 import { SCENARIOS, type ScenarioName, type World } from './scenarios';
 
 export type SyntheticFeedOptions = {
   scenario: ScenarioName;
-  /** People in the scene, me included (member 0). */
+  /** People in the scene, me included. */
   friends: number;
+  /**
+   * Who they are, in order (as many as `friends`). The same people, seed and order give the same
+   * crowd on every phone. Default: "Me", "Friend 1", ….
+   */
+  people?: readonly { key: string; name: string }[];
+  /** Which of them is me (drawn as my own dot). Default 0. */
+  meIndex?: number;
   seed: number;
   /** How often a moving friend sends a fix. */
   movingIntervalMs: number;
@@ -42,16 +49,6 @@ const INDOOR_SHARE = 0.03;
 const HISTORY_S = 300;
 const HISTORY_STEP_S = 5;
 const HISTORY_MAX_PEOPLE = 50;
-const PALETTE = [
-  '#E4572E',
-  '#17BEBB',
-  '#D4A20A',
-  '#2E282A',
-  '#76B041',
-  '#7B2CBF',
-  '#3A86FF',
-  '#FF006E',
-];
 
 /**
  * Stands in for the server feed, behind the same FeedManager protocol. Seeded: the same options
@@ -83,7 +80,8 @@ export class SyntheticFeedManager implements FeedManager {
     const n = options.friends;
     this.rng = createRng(options.seed);
     this.world = SCENARIOS[options.scenario].create(this.rng, n);
-    this.members = Array.from({ length: n }, (_, i) => memberAt(i));
+    const me = options.meIndex ?? 0;
+    this.members = Array.from({ length: n }, (_, i) => memberAt(i, me, options.people?.[i]));
     this.nextFixAt = new Float64Array(n);
     this.nextBeatAt = new Float64Array(n);
     this.seq = new Float64Array(n);
@@ -100,6 +98,11 @@ export class SyntheticFeedManager implements FeedManager {
       else if (r < OFFLINE_SHARE + PAUSED_SHARE + INDOOR_SHARE)
         this.indoorAccuracy[i] = this.rng.range(60, 120);
     }
+    // My own phone is always sharing, outdoors and online. (Drawn for everyone, then cleared, so
+    // the rest of the crowd is the same whoever is me.)
+    this.silentFrom[me] = Infinity;
+    this.paused[me] = 0;
+    this.indoorAccuracy[me] = 0;
     this.fixes = { n: 0, buf: new Float64Array(n * FIX_STRIDE) };
     this.beats = { n: 0, buf: new Float64Array(n * PRESENCE_STRIDE) };
   }
@@ -240,16 +243,26 @@ export class SyntheticFeedManager implements FeedManager {
   }
 }
 
-function memberAt(i: number): Member {
-  const name = i === 0 ? 'Me' : `Friend ${i}`;
+function memberAt(i: number, me: number, person?: { key: string; name: string }): Member {
+  if (person) {
+    return {
+      id: i,
+      key: person.key,
+      name: i === me ? 'You' : person.name,
+      initials: i === me ? 'ME' : initialsOf(person.name),
+      colour: colourFor(person.key),
+      isMe: i === me,
+    };
+  }
+  const name = i === me ? 'Me' : `Friend ${i}`;
   const initials =
-    i === 0 ? 'ME' : String.fromCharCode(65 + (i % 26)) + String.fromCharCode(65 + ((i * 7) % 26));
+    i === me ? 'ME' : String.fromCharCode(65 + (i % 26)) + String.fromCharCode(65 + ((i * 7) % 26));
   return {
     id: i,
     key: `synthetic-${i}`,
     name,
     initials,
     colour: PALETTE[i % PALETTE.length] as string,
-    isMe: i === 0,
+    isMe: i === me,
   };
 }

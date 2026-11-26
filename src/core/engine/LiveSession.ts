@@ -22,6 +22,7 @@ import type {
 } from '../protocols';
 import { bearingDeg, createStore, distanceMeters } from '../utils';
 import { budgetFor } from './budget';
+import { CameraDirector } from './camera';
 import { Presenter } from './presenter';
 import { LocationStore } from './store';
 import { throttle } from './throttle';
@@ -35,8 +36,8 @@ export type LiveSessionDeps = {
   profile: SessionProfile;
   /** Shown as the screen title. */
   title?: string;
-  /** Called by leave(): the app tears the session down and shows its start page. */
-  onLeave?: () => void;
+  /** Each time the map opens, fly in from the city to frame everyone. Default off. */
+  intro?: boolean;
   /** Group overlapping pins (large sessions). Off: every friend is always their own pin. Default on. */
   grouping?: boolean;
 };
@@ -45,12 +46,6 @@ const TICK_MS = 1000;
 const VIEWPORT_THROTTLE_MS = 150;
 /** Trails are re-sent at least this often so their fading keeps up with time. */
 const TRAIL_AGE_REFRESH_MS = 30_000;
-/** Fitting one friend (or friends in one spot) still shows this much around them, degrees (~200 m). */
-const MIN_FIT_SPAN_DEG = 0.002;
-/** Selecting a friend zooms in at least this far, so you can see them move. */
-const TRACK_ZOOM = 16;
-/** While following, re-centre once the friend has moved this share of the view. */
-const FOLLOW_SLACK = 0.15;
 
 /**
  * The controller. The only code that starts or stops anything.
@@ -88,13 +83,8 @@ export class LiveSession implements Session {
   private rowsTick = -1;
   private rowsCache: FriendRow[] = [];
   private readonly rowsVersion = createStore(0);
-  private fitted = false;
-  /**
-   * fit: keep everyone in view (at start) · follow: keep the selected friend in view ·
-   * free: the user moved the map, so the app leaves the camera alone.
-   */
-  private camera: 'fit' | 'follow' | 'free' = 'fit';
-  private followAt: [number, number] = [NaN, NaN];
+  private readonly camera: CameraDirector;
+  private mapReady = false;
 
   /** While the user pans or zooms, motion updates slow to the budget's gesture rate. */
   private readonly gestureMoving: ReturnType<typeof throttle>;
@@ -107,6 +97,7 @@ export class LiveSession implements Session {
   constructor(deps: LiveSessionDeps) {
     this.deps = deps;
     this.title = deps.title ?? 'Live';
+    this.camera = new CameraDirector(deps.map, deps.intro ?? false);
     const clock = deps.device.clock;
     this.budget = budgetFor(deps.device.power.get());
     this.gestureMoving = throttle(
@@ -129,14 +120,20 @@ export class LiveSession implements Session {
   /** Starts following foreground/map/power state. Returns stop(); start() may be called again afterwards. */
   start(): Stop {
     const { device, map } = this.deps;
-    const update = () => (device.foreground.get() && map.ready.get() ? this.run() : this.pause());
+    const update = () => {
+      const ready = map.ready.get();
+      if (ready && !this.mapReady) this.camera.newMap();
+      this.mapReady = ready;
+      if (device.foreground.get() && ready) this.run();
+      else this.pause();
+    };
     const subscriptions = [
       device.foreground.subscribe(update),
       map.ready.subscribe(update),
       map.onPinPress((member) => this.select(member)),
       device.power.subscribe(() => this.applyBudget()),
       map.viewport.subscribe(() => {
-        if (map.viewport.get()?.gesturing) this.camera = 'free'; // the user took the camera
+        if (map.viewport.get()?.gesturing) this.camera.release(); // the user took the camera
         if (this.running) this.viewportChange.call();
       }),
     ];
@@ -152,22 +149,10 @@ export class LiveSession implements Session {
     return this.handle !== null;
   }
 
-  leave() {
-    this.pause();
-    this.deps.onLeave?.();
-  }
-
   select(member: number | null) {
     this.selected.set(member);
-    if (member !== null && this.store.has(member)) {
-      // Track the friend: zoom in to see them move, and keep them in view until the user pans.
-      this.camera = 'follow';
-      const zoom = Math.max(this.deps.map.viewport.get()?.zoom ?? 0, TRACK_ZOOM);
-      this.followAt = [this.store.lng(member), this.store.lat(member)];
-      this.deps.map.centerOn(this.followAt[0], this.followAt[1], zoom);
-    } else if (member === null && this.camera === 'follow') {
-      this.camera = 'free'; // the sheet closed: leave the view where it is
-    }
+    // Track the friend: fly to them, then move with them until the user pans.
+    this.camera.select(member, this.store, this.deps.device.clock.now());
     this.deps.map.setSelected(member);
     if (this.presenter.updateGliding(this.store, member)) this.sendMoving();
     this.stillDirty = true;
@@ -209,8 +194,7 @@ export class LiveSession implements Session {
       this.store.reset(members.length, profile.maxSpeedMs);
       this.trails.reset(members.length, profile);
       this.presenter.reset(members.length);
-      this.fitted = false;
-      this.camera = 'fit';
+      this.camera.reset();
       this.presenter.setGrouping(this.deps.grouping ?? true);
       this.tickNo++;
       map.setMembers(members);
@@ -253,6 +237,9 @@ export class LiveSession implements Session {
       else if (this.presenter.isVisible(m)) this.stillDirty = true;
     }
     if (glidingMoved) this.requestMoving();
+    const followed = this.camera.following;
+    if (followed !== null && this.changed.includes(followed))
+      this.camera.follow(this.store, this.deps.device.clock.now());
   }
 
   private heartbeat(batch: PresenceBatch) {
@@ -282,7 +269,9 @@ export class LiveSession implements Session {
   }
 
   private applyBudget() {
-    this.budget = budgetFor(this.deps.device.power.get());
+    const power = this.deps.device.power.get();
+    this.budget = budgetFor(power);
+    this.camera.setCalm(power.lowPowerMode || power.reduceMotion);
     this.presenter.setBudget(this.budget);
     this.deps.map.setFrameRateCap(this.budget.glideFps);
     if (this.running && this.presenter.updateGliding(this.store, this.selected.get())) {
@@ -307,55 +296,11 @@ export class LiveSession implements Session {
     if (now - this.lastTrailsAt >= TRAIL_AGE_REFRESH_MS) this.trailsDirty = true;
     this.flushTrails();
     this.flushStill();
-    this.applyCamera();
+    this.camera.follow(this.store, now);
+    this.camera.fit(this.store, this.deps.map.viewport.get());
     this.tickNo++;
     if (this.rowsVersion.observed()) this.rowsVersion.set(this.tickNo);
   };
-
-  /**
-   * fit: frames every friend at start, and again only when someone leaves the view.
-   * follow: re-centres on the selected friend once they move 15% of the view.
-   * free (after any user gesture): the camera is the user's.
-   */
-  private applyCamera() {
-    const { map } = this.deps;
-    const view = map.viewport.get();
-    const s = this.store;
-    if (this.camera === 'follow') {
-      const m = this.selected.get();
-      if (m === null || !s.has(m) || !view) return;
-      const drifted =
-        Math.abs(s.lng(m) - this.followAt[0]) > (view.east - view.west) * FOLLOW_SLACK ||
-        Math.abs(s.lat(m) - this.followAt[1]) > (view.north - view.south) * FOLLOW_SLACK;
-      if (drifted) {
-        this.followAt = [s.lng(m), s.lat(m)];
-        map.centerOn(this.followAt[0], this.followAt[1]);
-      }
-      return;
-    }
-    if (this.camera !== 'fit') return;
-    let west = Infinity;
-    let south = Infinity;
-    let east = -Infinity;
-    let north = -Infinity;
-    let outside = false;
-    for (let m = 0; m < s.size; m++) {
-      if (!s.has(m) || s.paused(m)) continue;
-      const lng = s.lng(m);
-      const lat = s.lat(m);
-      west = Math.min(west, lng);
-      east = Math.max(east, lng);
-      south = Math.min(south, lat);
-      north = Math.max(north, lat);
-      if (view && (lng < view.west || lng > view.east || lat < view.south || lat > view.north))
-        outside = true;
-    }
-    if (!Number.isFinite(west) || (this.fitted && !outside)) return;
-    const padLng = Math.max(0, MIN_FIT_SPAN_DEG - (east - west)) / 2;
-    const padLat = Math.max(0, MIN_FIT_SPAN_DEG - (north - south)) / 2;
-    map.fitTo(west - padLng, south - padLat, east + padLng, north + padLat);
-    this.fitted = true;
-  }
 
   /** Every friend but me, nearest first; paused friends last. */
   private computeRows(now: number): FriendRow[] {
@@ -369,6 +314,7 @@ export class LiveSession implements Session {
       const known = meAt !== null && s.has(m);
       rows.push({
         id: m,
+        key: member.key,
         name: member.name,
         initials: member.initials,
         colour: member.colour,
@@ -377,6 +323,7 @@ export class LiveSession implements Session {
         bearingDeg: known ? bearingDeg(meAt[0] ?? 0, meAt[1] ?? 0, s.lng(m), s.lat(m)) : NaN,
         silentMs: now - s.heardAt(m),
         speedMs: s.speed(m),
+        coveredM: s.covered(m),
       });
     }
     const key = (r: FriendRow) =>

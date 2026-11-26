@@ -126,12 +126,12 @@ The rules are a dependency-cruiser **allow-list**; `docs/import-rules.md` is gen
 
 - Pure DI: constructor injection, typed as protocols. No container library: decorator-based ones need `reflect-metadata`, which Metro doesn't emit.
 - `app/container.ts` creates everything and starts the session; it's the only file naming implementations.
-- Screens call `useManagers()` and get **only** `{ session, MapView }`.
+- Screens call `useManagers()` and get **only** `{ sessions, live }` (since M7; before, `{ session, MapView }`).
 - Tests use `createTestManagers(overrides)`.
 
 ### 4.5 Navigation and the Detail sheet
 
-- React Navigation native stack in `app/navigation.tsx`: `Home` (headerless) and `Friend` (`DetailSheet`).
+- React Navigation native stack in `app/navigation.tsx`: two tabs, then `SessionMap`, `NewSession`, `Join`, `Person` and `Friend` (the sheet) over them (since M7; before, `Home` and `Friend`).
 - `Friend` options:
   - `presentation: 'formSheet'`;
   - at most three fixed `sheetAllowedDetents`;
@@ -139,7 +139,7 @@ The rules are a dependency-cruiser **allow-list**; `docs/import-rules.md` is gen
   - `contentStyle.backgroundColor` set.
 - **Never call `enableFreeze()`**: the map must keep drawing under the sheet.
 - **Selection lives only in the session:**
-  - `useHome` opens the sheet when `selected` becomes non-null;
+  - `useSessionMap` opens the sheet when `selected` becomes non-null;
   - `useDetail` closes it when selection becomes null;
   - dismissing the sheet calls `session.select(null)`;
   - the route has no params.
@@ -228,6 +228,7 @@ Most code is written with LLMs. The setup is lean on text and strong on automati
 - M4: viewer energy not measured; Low Power Mode wired (expo-battery), heat not (needs a native module).
 - M5: camera buttons dropped; the map frames everyone automatically. Default session is 4 friends plus you.
 - M6: no 12-cell matrix or energy step; README, demo video and an EAS APK instead.
+- M7 (added after M6, on the team's request): Sessions and Friends tabs, several saved sessions, invite links, a map per session, a person page, and camera motion (fly to, tilted follow, intro). Design §2.4 (Camera) and §2.6.
 
 | Priority | What |
 | --- | --- |

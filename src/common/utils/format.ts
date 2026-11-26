@@ -45,3 +45,28 @@ export function formatClock(epochMs: number): string {
   const d = new Date(epochMs);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+/** "12 km/h"; '' when still. */
+export function formatSpeed(speedMs: number): string {
+  if (!(speedMs >= 0.5)) return '';
+  return `${Math.round(speedMs * 3.6)} km/h`;
+}
+
+/** "5 people" — everyone in a session, you included. */
+export function formatPeople(count: number): string {
+  return `${count} ${count === 1 ? 'person' : 'people'}`;
+}
+
+/** The text an invite is shared with. */
+export function inviteMessage(from: string, title: string, url: string): string {
+  const who = from ? `${from} invited you` : 'You’re invited';
+  return `${who} to “${title}” on RTLS — see each other live on the map.\n${url}`;
+}
+
+/** A friend's status chip: "Live", "Active 2 min ago", "Last seen 10 min ago", "Paused sharing". */
+export function statusText(presence: number, silentMs: number): string {
+  if (presence === Presence.Live) return 'Live';
+  if (presence === Presence.Recent) return `Active ${formatAgo(silentMs)}`;
+  if (presence === Presence.Paused) return presenceLabel(presence);
+  return `${presenceLabel(presence)} ${formatAgo(silentMs)}`;
+}

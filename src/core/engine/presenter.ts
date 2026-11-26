@@ -164,14 +164,10 @@ export class Presenter {
     f.n = 0;
     for (const m of this.gliding) {
       const o = f.n * MOTION_STRIDE;
-      const interval = store.interval(m);
       f.buf[o] = m;
       f.buf[o + 1] = store.lng(m);
       f.buf[o + 2] = store.lat(m);
-      f.buf[o + 3] =
-        store.snapped(m) || Number.isNaN(interval)
-          ? 0
-          : Math.min(MAX_GLIDE_MS, Math.max(MIN_GLIDE_MS, interval));
+      f.buf[o + 3] = glideMs(store, m);
       f.buf[o + 4] = store.halo(m);
       f.n++;
     }
@@ -306,4 +302,12 @@ function grow(a: Float64Array | Uint32Array, size: number): Float64Array | Uint3
   const bigger = a instanceof Float64Array ? new Float64Array(size) : new Uint32Array(size);
   bigger.set(a);
   return bigger;
+}
+
+/** How long a member's pin glides to its latest fix: the last fix interval, clamped; 0 = snap (after a jump). */
+export function glideMs(store: LocationStore, m: number): number {
+  const interval = store.interval(m);
+  return store.snapped(m) || Number.isNaN(interval)
+    ? 0
+    : Math.min(MAX_GLIDE_MS, Math.max(MIN_GLIDE_MS, interval));
 }

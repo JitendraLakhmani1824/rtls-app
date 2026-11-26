@@ -1,4 +1,5 @@
 import { Avatar, colors, DirectionArrow } from '@common/ui';
+import type { Session } from '@core/protocols';
 import { memo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -6,8 +7,8 @@ import { useFriendList, type FriendItem } from '../useFriendList';
 
 const ROW_HEIGHT = 64;
 
-export function FriendList() {
-  const { items, select } = useFriendList();
+export function FriendList({ session }: { session: Session }) {
+  const { items, select } = useFriendList(session);
   return (
     <FlatList
       data={items}

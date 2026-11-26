@@ -126,4 +126,17 @@ describe('LocationStore', () => {
     store.heartbeat(beats([0, 2000, 0]));
     expect(store.speed(0)).toBe(0);
   });
+
+  it('adds up distance covered from real moves, not GPS drift, duplicates or dropped jumps', () => {
+    const store = storeOf(1, 10);
+    const changed: number[] = [];
+    store.ingest(batch([0, 1, 72, 19, 0]), changed);
+    store.ingest(batch([0, 2, 72, 19 + 300 * NORTH_1M, 100_000]), changed); // ~300 m in 100 s: walking
+    store.ingest(batch([0, 2, 72, 19 + 600 * NORTH_1M, 200_000]), changed); // duplicate seq
+    store.ingest(batch([0, 3, 72, 19 + 302 * NORTH_1M, 300_000]), changed); // 2 m in 100 s: drift
+    store.ingest(batch([0, 4, 72, 19 + 5302 * NORTH_1M, 301_000]), changed); // impossible jump: held
+    store.ingest(batch([0, 5, 72, 19 + 320 * NORTH_1M, 310_000]), changed); // jump rejected
+    expect(store.covered(0)).toBeGreaterThan(295);
+    expect(store.covered(0)).toBeLessThan(325);
+  });
 });

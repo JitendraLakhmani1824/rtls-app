@@ -74,12 +74,19 @@ module.exports = defineConfig([
             {
               group: ['@managers/*', '@maplibre/*'],
               message:
-                'Screens never touch managers. Get { session, MapView } from useManagers() in @common/di.',
+                'Screens never touch managers. Get { sessions, live } from useManagers() in @common/di.',
             },
             {
-              group: ['@core/engine', '@core/engine/*', '@core/sharing', '@core/sharing/*'],
+              group: [
+                '@core/engine',
+                '@core/engine/*',
+                '@core/sharing',
+                '@core/sharing/*',
+                '@core/sessions',
+                '@core/sessions/*',
+              ],
               message:
-                'Screens see only core/protocols, core/models and core/utils. Use the Session protocol.',
+                'Screens see only core/protocols, core/models and core/utils. Use the Session and Sessions protocols.',
             },
             { group: ['@app/*', '@lab/*'], message: 'Features may import only core and common.' },
           ],
@@ -104,6 +111,8 @@ module.exports = defineConfig([
                 '@core/engine/*',
                 '@core/sharing',
                 '@core/sharing/*',
+                '@core/sessions',
+                '@core/sessions/*',
               ],
               message: 'Managers see only core/protocols, core/models and core/utils.',
             },

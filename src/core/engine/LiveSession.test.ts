@@ -215,7 +215,12 @@ describe('LiveSession', () => {
       feed.fixes([1, 1, 72, 19, t0]);
       map.pressPin(1);
       expect(map.lastMoving).toHaveLength(1);
-      device.power.set({ lowPowerMode: false, thermal: 'critical', battery: 0.5 });
+      device.power.set({
+        lowPowerMode: false,
+        thermal: 'critical',
+        battery: 0.5,
+        reduceMotion: false,
+      });
       expect(map.frameRateCaps.at(-1)).toBe(0);
       expect(map.lastMoving).toEqual([]);
       device.clock.advance(1000);
@@ -307,28 +312,8 @@ describe('LiveSession', () => {
     });
   });
 
-  it('stops everything and tells the app when the user leaves', () => {
-    const device = new FakeDeviceManager();
-    const feed = new FakeFeedManager();
-    const map = new FakeMapManager();
-    let left = 0;
-    const session = new LiveSession({
-      feed,
-      map,
-      device,
-      perf: noopPerf,
-      profile: PROFILES.event,
-      onLeave: () => left++,
-    });
-    session.start();
-    session.leave();
-    expect(feed.running).toBe(false);
-    expect(device.clock.pendingTimers).toBe(0);
-    expect(left).toBe(1);
-  });
-
   describe('tracking a friend', () => {
-    it('zooms in on the selected friend and follows them until the user pans', () => {
+    it('flies to the selected friend, moves with them, and stops when the user pans', () => {
       const { device, feed, map, session, t0 } = setup();
       map.viewport.set(view(14));
       session.start();
@@ -336,16 +321,41 @@ describe('LiveSession', () => {
       feed.fixes([1, 1, 72, 19, t0]);
       device.clock.advance(1000);
       session.select(1);
-      expect(map.centers.at(-1)).toEqual([72, 19, 16]);
-      map.viewport.set({ ...view(16), west: 71.995, east: 72.005, south: 18.995, north: 19.005 });
-      device.clock.advance(1000);
-      feed.fixes([1, 2, 72, 19.003, t0 + 600_000]); // moved ~330 m: well past 15% of the view
-      device.clock.advance(1000);
-      expect(map.centers.at(-1)).toEqual([72, 19.003]);
+      expect(map.moves.at(-1)).toMatchObject({ lng: 72, lat: 19, zoom: 16, path: 'fly' });
+      device.clock.advance(2000); // the flight lands
+      feed.fixes([1, 2, 72, 19 + M, t0 + 3000]);
+      expect(map.moves.at(-1)).toMatchObject({ lat: 19 + M, ms: 3000, path: 'linear' });
       map.viewport.set({ ...view(16), gesturing: true }); // the user pans
-      feed.fixes([1, 3, 72, 19.006, t0 + 1_200_000]);
+      const moves = map.moves.length;
+      feed.fixes([1, 3, 72, 19 + 2 * M, t0 + 4000]);
       device.clock.advance(1000);
-      expect(map.centers.at(-1)).toEqual([72, 19.003]);
+      expect(map.moves).toHaveLength(moves);
+    });
+
+    it('flies in from the city the first time a map opens, and eases after that', () => {
+      const device = new FakeDeviceManager();
+      const feed = new FakeFeedManager();
+      const map = new FakeMapManager();
+      map.setReady(false);
+      const session = new LiveSession({
+        feed,
+        map,
+        device,
+        perf: noopPerf,
+        profile: PROFILES.event,
+        intro: true,
+      });
+      session.start();
+      map.setReady(true);
+      feed.members(fakeMembers(2));
+      feed.fixes([1, 1, 72, 19, device.clock.now()]);
+      device.clock.advance(1000);
+      device.setForeground(false); // back from the background: same map, no intro
+      device.setForeground(true);
+      feed.members(fakeMembers(2));
+      feed.fixes([1, 2, 72, 19, device.clock.now()]);
+      device.clock.advance(1000);
+      expect(map.fitPaths).toEqual(['fly', 'ease']);
     });
   });
 });

@@ -23,7 +23,12 @@ describe('presenceOf', () => {
 });
 
 describe('budgetFor', () => {
-  const power = { lowPowerMode: false, thermal: 'nominal' as const, battery: 1 };
+  const power = {
+    lowPowerMode: false,
+    thermal: 'nominal' as const,
+    battery: 1,
+    reduceMotion: false,
+  };
 
   it('gives the full animation budget on a cool phone', () => {
     expect(budgetFor(power)).toEqual({ glideLimit: 30, glideFps: 60, gestureUpdatesPerSec: 4 });

@@ -6,7 +6,7 @@ import { expectedIntervalMs, PAUSED_PRESENCE, presenceOf } from './presence';
 export const POOR_ACCURACY_M = 50;
 
 // Per member, preallocated in one Float64Array.
-const STRIDE = 13;
+const STRIDE = 14;
 const LNG = 0;
 const LAT = 1;
 const T = 2;
@@ -20,6 +20,10 @@ const SNAP = 9; // 1 = the latest fix was a confirmed jump: draw it without glid
 const JUMP_LNG = 10; // a fix too far from the last one, held until the next fix confirms or rejects it
 const JUMP_LAT = 11;
 const JUMP_T = 12;
+const COVERED = 13; // metres moved, counting only moves at walking pace or faster
+
+/** Slower than this between two fixes is GPS drift, not movement: it doesn't add to distance covered. */
+const COVER_MIN_MS = 0.5;
 
 /** A held jump is confirmed when the next fix lands this close to it. */
 const JUMP_CONFIRM_M = 50;
@@ -48,6 +52,7 @@ export class LocationStore {
     for (let m = 0; m < memberCount; m++) {
       this.data[m * STRIDE + PAUSED] = 0;
       this.data[m * STRIDE + SNAP] = 0;
+      this.data[m * STRIDE + COVERED] = 0;
     }
     this.touched = new Uint8Array(memberCount);
   }
@@ -145,10 +150,9 @@ export class LocationStore {
 
     const prevLng = d[b + LNG] ?? NaN;
     const prevLat = d[b + LAT] ?? NaN;
-    d[b + SPEED] =
-      snap || Number.isNaN(prevT) || t <= prevT
-        ? 0
-        : distanceMeters(prevLng, prevLat, lng, lat) / ((t - prevT) / 1000);
+    const moved = snap || Number.isNaN(prevT) ? 0 : distanceMeters(prevLng, prevLat, lng, lat);
+    d[b + SPEED] = snap || Number.isNaN(prevT) || t <= prevT ? 0 : moved / ((t - prevT) / 1000);
+    if ((d[b + SPEED] ?? 0) >= COVER_MIN_MS) d[b + COVERED] = (d[b + COVERED] ?? 0) + moved;
     d[b + PREV_T] = snap ? NaN : prevT;
     d[b + LNG] = lng;
     d[b + LAT] = lat;
@@ -176,6 +180,10 @@ export class LocationStore {
   /** Ground speed between the last two accepted fixes, m/s (0 until there are two, and after a jump). */
   speed(m: number) {
     return this.data[m * STRIDE + SPEED] ?? 0;
+  }
+  /** Metres moved so far (walking pace or faster; GPS drift and confirmed jumps don't count). */
+  covered(m: number) {
+    return this.data[m * STRIDE + COVERED] ?? 0;
   }
   /** Milliseconds between the last two fixes, or NaN if there is only one (or the last was a jump). */
   interval(m: number) {
