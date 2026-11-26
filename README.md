@@ -75,7 +75,7 @@ Every decision with its date and trade-off: [`docs/decisions.md`](docs/decisions
 | What | Result |
 | --- | --- |
 | 200 friends, "one marker view per friend" approach | App UI ~5 frames/s, 24–65% janky — fails |
-| 200 friends, ours | Map draws 19 frames/s (2.5× fewer than a single rebuilt source), JS 60 fps |
+| 200 friends, ours: still pins update ≤ 1×/s, moving pins glide on the UI thread | Map draws 19 frames/s (2.5× fewer than a single rebuilt source), JS 60 fps |
 | Gliding at street zoom | Frame gaps p50 16.7 ms, max 33.5 ms — never more than one refresh late |
 | Sharing battery (model) | 0.3–0.6 %/h standing still or unwatched vs 3.4 %/h for GPS-every-second; 2.1–2.8 %/h while a moving friend is watched |
 
