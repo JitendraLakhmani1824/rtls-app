@@ -4,6 +4,12 @@ Short log of choices made after the plan was closed. Newest first.
 
 | Date | Decision | Why | Cost / revisit when |
 | --- | --- | --- | --- |
+| 2026-11-26 | Every feature: `XScreen.tsx` + `hooks/` + `views/` (+ `logic/`), checked by `scripts/check-features.mjs`; screens and views can't import managers or navigation (lint) | One shape for every screen, so a reviewer sees how the app grows and new screens follow it | Small screens get a `views/` folder with one file |
+| 2026-11-26 | Trails for everyone up to 60 friends in view (was 30) | "In view" counts a 1.5× margin, so 30 meant 10–15 on screen: zooming into a crowd showed no trails. Replay fingerprint (marathon) updated: trail frames 29 → 54 a minute | Still ≤ 1 trail update a second |
+| 2026-11-26 | Onboarding (welcome, name, optional photo) before the app; your profile saved with the book (v2) | A first launch should explain the app and give friends a name and face to see; no account without a server | Photos stay on the phone; a server would sync them |
+| 2026-11-26 | Photos behind a `Photos` protocol (expo-image-picker), copied into the app's documents | The picker's file lives in a cache the phone may clear | — |
+| 2026-11-26 | One palette as design tokens; coral only as a fill, deeper coral for text; floating dark tab bar | The team's palette; coral on white is 2.3:1, too faint for text | — |
+| 2026-11-26 | A 150-person sample session; saved sessions replay trails on open at any size; no invites above 21 people | Shows grouping and zooming into trails; a link can't carry 150 names without a server | Measurement links keep the 50-person history limit, so recorded results stay comparable |
 | 2026-11-26 | Several screens: Sessions and Friends tabs; a map per session; join, new session and person pages; the start page is gone | The team asked for a real app shape: several sessions with different groups, invites, a page per friend | — |
 | 2026-11-26 | Only the session whose map is open runs; each session's engine is built on first open and kept | Battery: a viewer pays only for the map on screen. Re-opening resumes from the feed's cursor | Engines stay in memory for the app's life (a few sessions: small) |
 | 2026-11-26 | Sessions and people saved on the phone (AsyncStorage behind a `Storage` protocol), one versioned JSON document | No server. Bad entries are dropped one by one; unreadable data falls back to the sample book | A real account syncs them from the server |

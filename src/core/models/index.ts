@@ -167,6 +167,9 @@ export type Person = { key: string; name: string; circle: Circle };
 /** A session holds you and up to this many friends. */
 export const MAX_FRIENDS = 20;
 
+/** You, as friends see you. The photo is a local file URI, never uploaded (there's no server). */
+export type Profile = { name: string; photo: string | null; onboarded: boolean };
+
 /** The key of the phone's owner in every session. */
 export const ME_KEY = 'me';
 

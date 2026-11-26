@@ -1,10 +1,11 @@
 import type { RootStack, TabsParams } from '@common/navigation';
-import { colors, PeopleIcon, PinIcon } from '@common/ui';
+import { PeopleIcon, PinIcon, TabBar } from '@common/ui';
 import { DetailScreen } from '@features/detail';
 import { FriendsScreen } from '@features/friends';
 import { JoinScreen } from '@features/join';
 import { NewSessionScreen } from '@features/new-session';
 import { PersonScreen } from '@features/person';
+import { ProfileScreen } from '@features/profile';
 import { SessionMapScreen } from '@features/session-map';
 import { SessionsScreen } from '@features/sessions';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,14 +16,7 @@ const Tab = createBottomTabNavigator<TabsParams>();
 
 function Tabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.faint,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-      }}
-    >
+    <Tab.Navigator screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} />}>
       <Tab.Screen
         name="Sessions"
         component={SessionsScreen}
@@ -56,6 +50,7 @@ export function AppNavigation() {
         options={{ presentation: 'fullScreenModal' }}
       />
       <Stack.Screen name="Person" component={PersonScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen
         name="Friend"
         component={DetailScreen}

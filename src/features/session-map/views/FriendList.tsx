@@ -1,20 +1,25 @@
 import { Avatar, colors, DirectionArrow } from '@common/ui';
-import type { Session } from '@core/protocols';
 import { memo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useFriendList, type FriendItem } from '../useFriendList';
+import type { FriendItem } from '../hooks/useFriendList';
 
 const ROW_HEIGHT = 64;
 
-export function FriendList({ session }: { session: Session }) {
-  const { items, select } = useFriendList(session);
+/** Everyone but you, nearest first; tap to select. */
+export function FriendList({
+  items,
+  onSelect,
+}: {
+  items: FriendItem[];
+  onSelect: (id: number) => void;
+}) {
   return (
     <FlatList
       data={items}
       keyExtractor={(item) => String(item.id)}
       getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
-      renderItem={({ item }) => <Row item={item} onSelect={select} />}
+      renderItem={({ item }) => <Row item={item} onSelect={onSelect} />}
       ItemSeparatorComponent={Separator}
       ListEmptyComponent={<Text style={styles.empty}>Waiting for friends…</Text>}
     />

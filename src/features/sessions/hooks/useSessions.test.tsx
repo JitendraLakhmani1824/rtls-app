@@ -25,15 +25,17 @@ describe('useSessions', () => {
     const { result } = await setup();
     expect(result.current.cards.map((c) => c.title)).toEqual([
       'Road trip with family',
+      'Marathon running club',
       'Sunday marathon',
       'Concert night',
     ]);
-    expect(result.current.cards[1]).toMatchObject({
+    expect(result.current.cards[1]).toMatchObject({ detail: 'Marathon · 150 people', more: 145 });
+    expect(result.current.cards[2]).toMatchObject({
       icon: '🏃',
       detail: 'Marathon · 6 people',
       more: 1,
     });
-    expect(result.current.cards[1]?.avatars.map((a) => a.initials)).toEqual(['A', 'K', 'M', 'D']);
+    expect(result.current.cards[2]?.avatars.map((a) => a.initials)).toEqual(['A', 'K', 'M', 'D']);
   });
 
   it('opens a session’s map and starts a new one by route name', async () => {
@@ -54,7 +56,7 @@ describe('useSessions', () => {
 
   it('shares an invite with your name in it', async () => {
     const { managers, result } = await setup();
-    managers.sessions.setMyName('Asha');
+    managers.sessions.updateProfile({ name: 'Asha' });
     const share = jest
       .spyOn(Share, 'share')
       .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
@@ -62,5 +64,19 @@ describe('useSessions', () => {
     expect(share.mock.calls[0]?.[0].message).toMatch(
       /^Asha invited you to “Road trip with family”.*\nrtls:\/\/join\/[A-Z2-9]{6}\?e=trip/s,
     );
+  });
+
+  it('offers invites only for sessions a link can carry', async () => {
+    const { result } = await setup();
+    expect(result.current.cards.map((c) => c.canInvite)).toEqual([true, false, true, true]);
+  });
+
+  it('greets you by first name, and opens your profile from your avatar', async () => {
+    const { managers, result } = await setup();
+    expect(result.current.greeting).toBe('Your sessions');
+    await act(() => managers.sessions.updateProfile({ name: 'Asha Rao' }));
+    expect(result.current.greeting).toBe('Hi, Asha');
+    await act(() => result.current.openProfile());
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Profile');
   });
 });

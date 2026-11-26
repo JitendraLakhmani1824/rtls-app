@@ -4,6 +4,7 @@ import { createRng } from '@core/utils';
 
 import { FakeClock } from './FakeClock';
 import { FakeLive } from './FakeLive';
+import { FakePhotos } from './FakePhotos';
 import { FakeSession } from './FakeSession';
 import { MemoryStorage } from './MemoryStorage';
 
@@ -11,6 +12,7 @@ export type TestManagers = Screens & {
   /** A real book over memory storage. Call `await sessions.load()` for the sample people and sessions. */
   sessions: SessionBook;
   live: FakeLive;
+  photos: FakePhotos;
   /** The open map's session (live.current), id 'TEST01'. */
   session: FakeSession;
   view: LiveView;
@@ -26,5 +28,5 @@ export function createTestManagers(): TestManagers {
   const live = new FakeLive();
   live.views.set(view.id, view);
   live.current.set(view);
-  return { sessions, live, session, view, storage };
+  return { sessions, live, photos: new FakePhotos(), session, view, storage };
 }

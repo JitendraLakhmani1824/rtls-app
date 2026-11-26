@@ -75,7 +75,9 @@ function fnv1a(text: string): string {
 describe('replay fingerprint (seed 42, 60 s, all faults on)', () => {
   it.each([
     ['concert', { still: 63, moving: 174, trails: 10, hash: '887c8778' }],
-    ['marathon', { still: 64, moving: 287, trails: 29, hash: '18690f8f' }],
+    // Changed on purpose (2026-11-26): trails for everyone up to 60 friends in view (was 30), so
+    // zooming into a crowd shows its trails. Trail frames 29 → 54 a minute, still ≤ 1 a second.
+    ['marathon', { still: 64, moving: 287, trails: 54, hash: '0e5fe086' }],
     ['trip', { still: 52, moving: 245, trails: 61, hash: '11e703b2' }],
   ] as const)('%s sends the same frames to the map as before', (scenario, expected) => {
     expect(replay(scenario)).toEqual(expected);

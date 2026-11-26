@@ -95,6 +95,60 @@ module.exports = defineConfig([
     },
   },
   {
+    // Feature layout: <Name>Screen.tsx wires hooks/ to views/. Only hooks/ touch managers and
+    // navigation; views/ take props. (Folder shape: scripts/check-features.mjs.)
+    files: ['src/features/*/*Screen.tsx', 'src/features/*/views/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@common/di', '@react-navigation/*'],
+              message:
+                'Screens and views get data and actions from the feature hook (hooks/useX.ts), which is the only file that uses managers or navigation.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/features/*/views/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@common/di', '@react-navigation/*'],
+              message:
+                'Views take props. Data and actions come from the feature hook (hooks/useX.ts) through the screen.',
+            },
+            {
+              group: ['../hooks/*'],
+              allowTypeImports: true,
+              message:
+                'Views take props: import only types from hooks/ (`import type`). Call the hook in the screen.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/features/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message: 'No hard-coded colours in screens: use `colors` from @common/ui (theme.ts).',
+        },
+      ],
+    },
+  },
+  {
     files: ['src/managers/**'],
     rules: {
       'no-restricted-imports': [

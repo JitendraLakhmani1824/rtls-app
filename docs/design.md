@@ -250,6 +250,8 @@ How the app works inside. Everything here is built, except §2.7's sharing phone
 src/
 ├── app/            start-up wiring: container.ts · launch-params.ts · linking.ts · navigation.tsx · Root.tsx
 ├── features/
+│   ├── onboarding/ first launch: welcome, name, photo
+│   ├── profile/    your photo and name
 │   ├── sessions/   your sessions (tab)
 │   ├── friends/    everyone you know, your name (tab)
 │   ├── new-session/  event, name, who's coming
@@ -261,7 +263,8 @@ src/
 │   ├── map/        MapLibreManager · MapView · layers · encode
 │   ├── feed/       SyntheticFeedManager · scenarios/ · tracks · withFaults
 │   ├── device/     ExpoDeviceManager: clock · frames · visibility · power · Reduce Motion
-│   └── storage/    AsyncStorageManager
+│   ├── storage/    AsyncStorageManager
+│   └── photos/     ExpoPhotoManager (image picker, copies into app storage)
 ├── common/
 │   ├── ui/         theme · Button · Badge · Avatar · Panel · ErrorBoundary
 │   ├── utils/      distance / direction / "10 s ago" text
@@ -279,7 +282,7 @@ src/
 modules/rtls-thermal/   native heat reader (Swift + Kotlin), used only by managers/device
 ```
 
-A feature starts as `XScreen` + `useX`. It gains `views/` past ~150 lines and `logic/` only when there is real logic.
+Every feature has the same shape: `index.ts`, a thin `XScreen.tsx`, `hooks/useX.ts` (+ test; the only files that use managers or navigation), `views/` (props-only components), and `logic/` only when there is real logic. `scripts/check-features.mjs` checks it in `pnpm verify`; lint keeps screens and views away from managers and navigation.
 
 ```mermaid
 flowchart TB
@@ -318,7 +321,7 @@ export function createApp() {
     close(id) { /* stop it if it's running */ },
     current,  // Readable<{ id, session, MapView } | null>
   }
-  return { screens: { sessions, live }, start: () => { device.watch(); sessions.load() } }
+  return { screens: { sessions, live, photos }, start: () => { device.watch(); sessions.load() } }
 }
 
 // app/Root.tsx
@@ -326,7 +329,7 @@ useEffect(() => app.start(), [app])               // restartable, so React's dev
 <ManagersProvider value={app.screens}>…</ManagersProvider>
 ```
 
-`useManagers()` returns `{ sessions: Sessions; live: LiveSessions }` — screens cannot reach the feed, the device, storage or the map manager. **Only one session runs at a time**: the one whose map is open. Its engine is built on first open, kept, and paused when the map closes. Tests build the same shape with `createTestManagers()` (a real `SessionBook` over memory storage, a fake live session).
+`useManagers()` returns `{ sessions: Sessions; live: LiveSessions; photos: Photos }` — screens cannot reach the feed, the device, storage or the map manager. **Only one session runs at a time**: the one whose map is open. Its engine is built on first open, kept, and paused when the map closes. Tests build the same shape with `createTestManagers()` (a real `SessionBook` over memory storage, a fake live session).
 
 ## 2.2 Protocols
 
@@ -366,6 +369,7 @@ interface Sessions       { loaded, people, list, myName: Readable<…>; get(id);
                            readInvite(parts): Invite | null; join(invite, as); remove(id); addPerson(name, circle)
                            setMyName(name); inviteUrl(id) }                  // saved in the background
 interface Storage        { load(key): Promise<string | null>; save(key, value): Promise<void> }   // never throws
+interface Photos         { pick(from: 'library' | 'camera'): Promise<string | null>; remove(uri): Promise<void> }
 interface Perf           { time(name: string, ms: number): void; count(name: string): void }
 
 // Sharing phone (design; simulated in core/sharing)
@@ -481,6 +485,7 @@ stateDiagram-v2
 - **Pin taps.** The session listens to `map.onPinPress` and calls `select(id)`. Screens only react to `selected`.
 - **Camera:** `CameraDirector` (below) decides; `LiveSession` calls it on select, on each batch that moved the followed friend, and on the tick.
 - **Grouping:** only for sessions over 30 friends. A group of friends always shows every friend, and they may glide at any zoom.
+- **Trails:** everyone's while up to 60 friends are in view (the screen plus a 1.5× margin, so about 20–25 on screen); above that, only the selected friend's. In a dense crowd, select a runner to see theirs.
 - **Lazy snapshot.** `rows`, `selected` and `connection` are separate readables. `rows` is computed at most once per tick, only when read, and subscribers hear about it only while subscribed.
 
 ### Camera (`camera.ts`)
@@ -533,11 +538,14 @@ Every move is one `MapManager.moveCamera` / `fitTo` call; MapLibre animates it n
 - **Shape:** `XScreen` wires `useX()` to views. `useX` is the only file that uses `useManagers()` and navigation, and returns data + actions. Function components only; the one class is `ErrorBoundary`.
 - **Snapshot hooks:** `useRows()`, `useSelected()`, `useConnection()` — `useSyncExternalStore` over the session's readables. Nothing subscribes to per-frame data. The friend list mounts only when the panel is expanded, so collapsed means `rows` is never computed.
 - **Text:** the snapshot carries distance and bearing from me, and age, as numbers; rows arrive sorted by distance. `common/utils` formats "350 m NE" and "updated 10 s ago".
+- **Onboarding:** on first launch, before navigation exists: a welcome (what the app does, three promises), then your name and an optional photo. A link that opened the app is handled right after. Joining from an invite link counts as onboarding (you picked who you are). Measurement links skip it.
+- **Profile:** your photo (picked or taken, cropped square, copied into the app's documents so the picker's cache can't lose it) and name. Saved with the book (`Profile`, book v2; v1 books are read too). Nothing is uploaded.
+- **Look:** tokens in `common/ui/theme.ts` from one palette (Whiteout, Nebulous White, Astroscopus Grey, Indian Dance coral, Hypnotic slate, Tricon Black). Coral is a fill, never small text (2.3:1 on white); ink on coral is 5.9:1; coral text uses a deeper shade. A floating dark pill tab bar; screens start with your avatar (opens Profile) and an action, then a large title.
 - **Navigation:** two tabs (Sessions, Friends) inside a native stack. A session's map, a person's page, New session and Join open over the tabs, full screen; the friend sheet is a form sheet over the map.
 - **Sessions and people** (`core/sessions/SessionBook`): saved on the phone (`Storage` → AsyncStorage), one JSON document, versioned; entries that don't parse are dropped one by one, unreadable data falls back to a sample book (family, friends, one session of each event). Changes apply in memory at once and are saved in order in the background.
 - **Invite links:** `rtls://join/K7Q2XP?e=marathon&t=City%20Marathon&p=Asha,Riya,Arjun&f=0` — code, event, title, everyone in order, who sent it. Without a server the link *is* the session: the code seeds the simulation and the order is kept, so every phone that joins simulates the same people and routes (live positions only roughly agree, since each phone runs its own clock). Joining asks "which one are you?"; people are matched to your list by name. `rtls://session/<id>` opens a map. A real app would use https app links on the server's domain.
-- **Sessions tab:** cards (event, title, faces, count); tap opens the map; ••• or long-press: invite, leave.
-- **Friends tab:** your name (shown on invites), then Family and Friends; add a person.
+- **Sessions tab:** "Hi, Asha"; cards (event, title, faces, count); tap opens the map; ••• or long-press: invite (sessions a link can carry, ≤ 21 people), leave. The sample book has a 150-person running club, so grouping shows; saved sessions get the last 5 minutes of trails at any size.
+- **Friends tab:** you (opens Profile), then Family and Friends; add a person.
 - **Session map:** full-screen `MapView`; Back, a title card (session name, "7 of 9 friends live", connection pill — "Offline · as of 14:05"), Invite (share sheet); the friends panel (nearest avatars when closed, the list when open). Tapping a row or a pin calls `session.select(id)`. When `selected` becomes non-null, `useSessionMap` navigates to `Friend` and hides the panel: one bottom surface at a time. Opened with `focus` (from a person's page), it selects that person once the map has them.
 - **Markers:** friends are initials in their colour with a white ring and shadow; Recent fades, Stale turns grey; names show from zoom 16. The selected friend gets a soft glow, a white ring in their colour, their name, and a one-off ripple (no endless animation). Me is a blue dot with a halo in its own source: never grouped, above every still friend (the selected friend draws above it, so its name stays readable).
 - **Detail:** React Navigation native-stack screen `Friend`:

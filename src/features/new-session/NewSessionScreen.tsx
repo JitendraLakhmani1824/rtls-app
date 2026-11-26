@@ -1,8 +1,8 @@
-import { colors, PrimaryButton, radius, ScreenHeader } from '@common/ui';
+import { colors, PrimaryButton, radius, ScreenHeader, typeScale } from '@common/ui';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useNewSession } from './useNewSession';
+import { useNewSession } from './hooks/useNewSession';
 import { EventPicker } from './views/EventPicker';
 import { PeoplePicker } from './views/PeoplePicker';
 
@@ -56,15 +56,7 @@ export function NewSessionScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.page },
   content: { paddingHorizontal: 20, paddingBottom: 24 },
-  section: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.muted,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    marginTop: 16,
-    marginBottom: 10,
-  },
+  section: { ...typeScale.label, marginTop: 16, marginBottom: 10 },
   input: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

@@ -41,8 +41,8 @@ const CAMERA_PADDING = { top: 120, right: 48, bottom: 260, left: 48 };
 const FOLLOW_PADDING = { top: 0, right: 0, bottom: 240, left: 0 };
 /** The selection ripple's length; it plays once. */
 const RIPPLE_MS = 900;
-const INK = '#0f172a';
-const STALE = '#94a3b8';
+const INK = '#2F2F2F';
+const STALE = '#AEB4B7';
 const ME_BLUE = '#2563eb';
 const FONT_REGULAR = ['Noto Sans Regular'];
 /** Radius true to metres at every zoom: h is points at zoom 0, doubled per zoom level. */
@@ -245,6 +245,7 @@ function StillPins({
         const zoom = await sourceRef.current?.getClusterExpansionZoom(props.cluster_id);
         const [lng, lat] = f.geometry.coordinates;
         if (zoom !== undefined && lng !== undefined && lat !== undefined) {
+          model.handleUserCamera(); // the user took the camera: stop framing everyone
           cameraRef.current?.easeTo({ center: [lng, lat], zoom, duration: 400 });
         }
         return;
@@ -345,22 +346,26 @@ function StillPins({
         }}
         paint={{ 'text-color': '#ffffff' }}
       />
-      <Layer
-        id="still-names"
-        type="symbol"
-        minzoom={16}
-        filter={['!', ['has', 'point_count']]}
-        layout={{
-          'text-field': ['get', 'n'],
-          'text-font': FONT_REGULAR,
-          'text-size': 11,
-          'text-anchor': 'top',
-          'text-offset': [0, 1.4],
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        }}
-        paint={{ 'text-color': INK, 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 }}
-      />
+      {/* Names: for a group of friends. In a crowd (grouped sessions) they'd pile up; only the
+          selected friend's name shows. */}
+      {!model.groupPins && (
+        <Layer
+          id="still-names"
+          type="symbol"
+          minzoom={16}
+          filter={['!', ['has', 'point_count']]}
+          layout={{
+            'text-field': ['get', 'n'],
+            'text-font': FONT_REGULAR,
+            'text-size': 11,
+            'text-anchor': 'top',
+            'text-offset': [0, 1.4],
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+          }}
+          paint={{ 'text-color': INK, 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 }}
+        />
+      )}
     </GeoJSONSource>
   );
 }
@@ -536,15 +541,18 @@ function GlidingPins({ model }: { model: MapViewModel }) {
           id="moving-names"
           type="symbol"
           layout={{
-            // The selected friend's name always; everyone's when zoomed in. (MapLibre allows
-            // `zoom` only at the top of an expression, so the zoom step wraps the selection test.)
-            'text-field': [
-              'step',
-              ['zoom'],
-              ['case', ['==', ['get', 's'], 1], ['get', 'n'], ''],
-              16,
-              ['get', 'n'],
-            ],
+            // The selected friend's name always; everyone's when zoomed in, unless it's a crowd.
+            // (MapLibre allows `zoom` only at the top of an expression, so the zoom step wraps
+            // the selection test.)
+            'text-field': model.groupPins
+              ? ['case', ['==', ['get', 's'], 1], ['get', 'n'], '']
+              : [
+                  'step',
+                  ['zoom'],
+                  ['case', ['==', ['get', 's'], 1], ['get', 'n'], ''],
+                  16,
+                  ['get', 'n'],
+                ],
             'text-font': FONT,
             'text-size': ['case', ['==', ['get', 's'], 1], 13, 11],
             'text-anchor': 'top',

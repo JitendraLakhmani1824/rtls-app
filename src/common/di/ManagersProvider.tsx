@@ -1,5 +1,5 @@
-import type { ConnState, FriendRow, Person, SessionRecord } from '@core/models';
-import type { Readable, Session, Sessions } from '@core/protocols';
+import type { ConnState, FriendRow, Person, Profile, SessionRecord } from '@core/models';
+import type { Photos, Readable, Session, Sessions } from '@core/protocols';
 import {
   createContext,
   useContext,
@@ -30,6 +30,7 @@ export interface LiveSessions {
 export type Screens = {
   sessions: Sessions;
   live: LiveSessions;
+  photos: Photos;
 };
 
 const ScreensContext = createContext<Screens | null>(null);
@@ -92,9 +93,9 @@ export function usePeople(): Person[] {
   return useReadable(useManagers().sessions.people);
 }
 
-/** Your name, as invites show it. */
-export function useMyName(): string {
-  return useReadable(useManagers().sessions.myName);
+/** You: name, photo, onboarded. */
+export function useProfile(): Profile {
+  return useReadable(useManagers().sessions.profile);
 }
 
 /**

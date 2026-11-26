@@ -4,19 +4,21 @@ See where your friends are at an event — a concert, a marathon, a road trip �
 
 A case study for Principal Engineer, Mobile. Expo SDK 58 · React Native 0.88 (New Architecture) · TypeScript · MapLibre · Reanimated worklets.
 
-![Start page, marathon with trails, friend list, following a runner, following a car](docs/media/rtls-screens.png)
+![Onboarding, sessions, a 150-person running club in groups, following a runner with her trail, a family road trip with trails, your profile](docs/media/rtls-screens.png)
 
 ## Try it
 
 - **Android:** download the APK from [Releases](https://github.com/JitendraLakhmani1824/rtls-app/releases/latest) and open it on the phone (allow installs from this source when asked). Phones (arm64) and x86_64 emulators.
-- **Videos:** [Android, OnePlus 10T](docs/media/rtls-demo-android.mp4) (49 s) · [iOS simulator](docs/media/rtls-demo.mp4) (45 s). Both release builds.
+- **Videos:** [Android, OnePlus 10T](docs/media/rtls-demo-android.mp4) (88 s: onboarding, the 150-person club in groups, zooming in, following a runner, the family road trip, profile) · [iOS simulator](docs/media/rtls-demo.mp4) (97 s: the same story on an iPhone 17 Pro simulator, including picking a profile photo). Both release builds.
 
-What to do: the **Sessions** tab has three sample sessions (family road trip, marathon, concert); open one. The map flies in from the city and frames everyone, with the last 5 minutes of their trails. Tap a friend (pin or list): the camera flies to them and moves with them, tilting to their direction when they run or drive; the sheet shows distance, direction and movement, and **View details** opens their page. **Invite** shares a join link. **+** starts a new session with people from your **Friends** tab. Friends are simulated on the phone, with realistic movement for each event.
+What to do: a short onboarding asks your name and (optionally) a photo. The **Sessions** tab then has four sample sessions: a family road trip, a 150-person running club (grouped when zoomed out; tap a group to zoom in, tap a runner to follow them and see their trail), a marathon and a concert. Open one. The map flies in from the city and frames everyone, with the last 5 minutes of their trails. Tap a friend (pin or list): the camera flies to them and moves with them, tilting to their direction when they run or drive; the sheet shows distance, direction and movement, and **View details** opens their page. **Invite** shares a join link. **+** starts a new session with people from your **Friends** tab. Friends are simulated on the phone, with realistic movement for each event.
 
 | Screen         | What it does                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------------ |
+| Onboarding     | Welcome, then your name and photo (first launch)                                                 |
 | Sessions (tab) | Your sessions; open one, start one (+), invite or leave (•••)                                    |
-| Friends (tab)  | Family and friends, your name for invites, add a person                                          |
+| Friends (tab)  | You (opens your profile), family and friends, add a person                                       |
+| Profile        | Change your photo and name                                                                       |
 | New session    | Event, name, who's coming (pick a whole circle at once)                                          |
 | Session map    | Live pins, trails, presence; Back, Invite; friends panel                                         |
 | Friend sheet   | Distance, direction, movement; View details                                                      |
@@ -110,10 +112,11 @@ Scenario links open an unsaved map directly (used for measurement): `rtls://scen
 
 ```
 src/app/           start-up wiring: container.ts (the only place managers are created), Root, navigation, deep links
-src/features/      sessions · friends (tabs) · new-session · join · session-map · detail (native sheet) · person
-src/common/        di (snapshot hooks) · ui (Avatar, StatTile, ScreenHeader, theme) · utils (formatting) · navigation types
+src/features/      onboarding · sessions · friends (tabs) · profile · new-session · join · session-map · detail (sheet) · person
+                   each: XScreen.tsx (thin) · hooks/useX.ts + test · views/ (props-only) — checked in pnpm verify
+src/common/        di (snapshot hooks) · ui (palette tokens, TabBar, Avatar, PhotoButton, ScreenHeader) · utils (formatting) · navigation types
 src/core/          pure TypeScript: models → protocols → engine (LiveSession, stores, Presenter, camera) · sessions (book, invites) · sharing (policy)
-src/managers/      map (MapLibre + worklet) · feed (synthetic friends + faults) · device (clock, app state, battery) · storage
+src/managers/      map (MapLibre + worklet) · feed (synthetic friends + faults) · device (clock, app state, battery) · storage · photos
 src/lab/           dev-only: comparison ladder (rungs A–D), PerfRecorder, battery model
 src/testing/       fakes, contract tests, replay fingerprint
 docs/              prd · design (HLD + LLD) · plan · decisions · results · media
@@ -121,7 +124,7 @@ docs/              prd · design (HLD + LLD) · plan · decisions · results · 
 
 ## Testing
 
-216 tests, all with fakes and virtual time — no real timers or network:
+229 tests, all with fakes and virtual time — no real timers or network:
 
 - **Unit:** store, trails, presence, presenter, budget, camera, sharing policy, session book, invite links, formatting.
 - **Contracts:** every `FeedManager`, `Clock` and `Storage` implementation passes the same suite.
@@ -132,7 +135,7 @@ docs/              prd · design (HLD + LLD) · plan · decisions · results · 
 
 ## How AI was used
 
-Built with Claude Code. The repository is set up so an assistant follows the architecture without being told: `AGENTS.md` and per-folder `CLAUDE.md` cards, path-specific rules, import rules that fail the build with a fix-it message, a hook that runs `pnpm verify` before finishing, and skills to run a scenario on a device and measure it. Every number was measured on the phone, and the decisions log records what changed and why.
+Built with Claude Code. The repository is set up so an assistant follows the architecture without being told: `AGENTS.md` and per-folder `CLAUDE.md` cards, path-specific rules, import rules that fail the build with a fix-it message, a hook that runs `pnpm verify` before finishing, a feature-layout check, and skills to add a screen or a manager, run a scenario on a device, measure it, and ship a release. Every number was measured on the phone, and the decisions log records what changed and why.
 
 ## Not built
 

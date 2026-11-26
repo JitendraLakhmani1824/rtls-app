@@ -63,3 +63,6 @@ export function useJoin() {
     },
   };
 }
+
+/** Someone you could be, in an invite. */
+export type JoinPerson = Extract<ReturnType<typeof useJoin>, { state: 'choose' }>['people'][number];

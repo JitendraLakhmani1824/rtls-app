@@ -1,16 +1,23 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, radius, shadow } from './theme';
+import { colors, radius } from './theme';
 
-/** The screen's main action, full width. */
+type Variant = 'primary' | 'accent' | 'secondary';
+
+/**
+ * A full-width action. primary: Tricon Black (the main action) · accent: coral with ink text
+ * (a highlight, used sparingly) · secondary: white with a border.
+ */
 export function PrimaryButton({
   label,
   onPress,
   disabled = false,
+  variant = 'primary',
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  variant?: Variant;
 }) {
   return (
     <Pressable
@@ -18,27 +25,30 @@ export function PrimaryButton({
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
+        styles[variant],
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
     >
-      <Text style={[styles.text, disabled && styles.textDisabled]}>{label}</Text>
+      <Text
+        style={[styles.text, variant !== 'primary' && styles.textDark, disabled && styles.textOff]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: colors.ink,
-    borderRadius: radius.lg,
-    paddingVertical: 17,
-    alignItems: 'center',
-    ...shadow,
-  },
-  disabled: { backgroundColor: colors.line, shadowOpacity: 0, elevation: 0 },
-  pressed: { opacity: 0.9 },
-  text: { fontSize: 17, fontWeight: '700', color: '#ffffff' },
-  textDisabled: { color: colors.faint },
+  button: { borderRadius: radius.pill, paddingVertical: 17, alignItems: 'center' },
+  primary: { backgroundColor: colors.ink },
+  accent: { backgroundColor: colors.accent },
+  secondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.line },
+  disabled: { backgroundColor: colors.line, borderColor: colors.line },
+  pressed: { opacity: 0.85 },
+  text: { fontSize: 17, fontWeight: '600', color: '#FFFFFF' },
+  textDark: { color: colors.ink },
+  textOff: { color: colors.muted },
 });

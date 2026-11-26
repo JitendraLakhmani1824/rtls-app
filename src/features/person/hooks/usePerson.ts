@@ -1,6 +1,6 @@
 import { useLiveRow, useManagers, usePeople, useSessionList } from '@common/di';
 import type { RootStack } from '@common/navigation';
-import { EVENTS } from '@common/ui';
+import { colors, EVENTS } from '@common/ui';
 import {
   formatAgo,
   formatDirection,
@@ -40,7 +40,7 @@ export function usePerson() {
   return {
     name,
     initials: person ? initialsOf(person.name) : (row?.initials ?? '?'),
-    colour: person ? colourFor(person.key) : (row?.colour ?? '#94a3b8'),
+    colour: person ? colourFor(person.key) : (row?.colour ?? colors.faint),
     circle: person ? (person.circle === 'family' ? 'Family' : 'Friend') : '',
     live:
       now && row
@@ -72,3 +72,8 @@ export function usePerson() {
     back: () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Tabs')),
   };
 }
+
+/** Their live numbers, while they're on the open map. */
+export type PersonLive = NonNullable<ReturnType<typeof usePerson>['live']>;
+/** A session you share with them. */
+export type SharedSession = ReturnType<typeof usePerson>['together'][number];

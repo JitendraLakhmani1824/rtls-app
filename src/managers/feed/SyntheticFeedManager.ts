@@ -22,6 +22,8 @@ export type SyntheticFeedOptions = {
   people?: readonly { key: string; name: string }[];
   /** Which of them is me (drawn as my own dot). Default 0. */
   meIndex?: number;
+  /** Replay the last few minutes on first start, so trails show at once. Default: up to 50 people. */
+  history?: boolean;
   seed: number;
   /** How often a moving friend sends a fix. */
   movingIntervalMs: number;
@@ -124,7 +126,8 @@ export class SyntheticFeedManager implements FeedManager {
 
     sink.onMembers(this.members);
     sink.onState({ kind: 'live', sinceMs: now });
-    if (firstStart && this.members.length <= HISTORY_MAX_PEOPLE) this.sendHistory(sink, now);
+    const history = this.options.history ?? this.members.length <= HISTORY_MAX_PEOPLE;
+    if (firstStart && history) this.sendHistory(sink, now);
     sink.onFixes(this.snapshot(now)); // like the server's snapshot: everyone's latest position
     sink.onPresence(this.joinBeats(now));
 

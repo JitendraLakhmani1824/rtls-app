@@ -1,0 +1,102 @@
+import { Avatar, Chevron, colors, DirectionArrow, radius, StatTile, StatusChip } from '@common/ui';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import type { DetailFriend } from '../hooks/useDetail';
+
+/** The selected friend: who, status, distance, direction, movement; close and View details. */
+export function FriendCard({
+  friend,
+  onClose,
+  onDetails,
+}: {
+  friend: DetailFriend;
+  onClose: () => void;
+  onDetails: () => void;
+}) {
+  return (
+    <View
+      style={styles.card}
+      accessible
+      accessibilityLabel={`${friend.name}, ${friend.status}, ${friend.where}`}
+    >
+      <View style={styles.header}>
+        <Avatar
+          initials={friend.initials}
+          colour={friend.colour}
+          presence={friend.presence}
+          size={56}
+        />
+        <View style={styles.title}>
+          <Text style={styles.name} numberOfLines={1}>
+            {friend.name}
+          </Text>
+          <StatusChip presence={friend.presence} text={friend.status} />
+        </View>
+        <Pressable
+          onPress={onClose}
+          hitSlop={12}
+          style={styles.close}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.closeText}>✕</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.tiles}>
+        <StatTile label="Distance" value={friend.distance} />
+        <StatTile
+          label="Direction"
+          value={friend.direction}
+          icon={<DirectionArrow bearingDeg={friend.bearingDeg} size={16} color={colors.ink} />}
+        />
+        <StatTile label="Moving" value={friend.movement} />
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.updated}>{friend.updated}</Text>
+        <Pressable
+          onPress={onDetails}
+          hitSlop={8}
+          style={({ pressed }) => [styles.details, pressed && styles.detailsPressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`View details for ${friend.name}`}
+        >
+          <Text style={styles.detailsText}>View details</Text>
+          <Chevron color={colors.accentInk} size={8} direction="right" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: { gap: 18 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  title: { flex: 1, gap: 6 },
+  name: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  close: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.subtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  closeText: { fontSize: 14, fontWeight: '700', color: colors.muted },
+  tiles: { flexDirection: 'row', gap: 10 },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  updated: { fontSize: 13, color: colors.faint },
+  details: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentSoft,
+  },
+  detailsPressed: { opacity: 0.8 },
+  detailsText: { fontSize: 14, fontWeight: '600', color: colors.accentInk },
+});

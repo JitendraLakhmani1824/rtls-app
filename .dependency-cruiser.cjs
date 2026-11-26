@@ -90,6 +90,12 @@ module.exports = {
       to: { path: npm('@react-native-async-storage/async-storage') },
     },
     {
+      comment:
+        'managers-photos-libraries — managers/photos is the only folder that may import the image picker and file system.',
+      from: { path: '^src/managers/photos/' },
+      to: { path: npm('expo-image-picker', 'expo-file-system', 'expo-modules-core') },
+    },
+    {
       comment: 'common-core — common/* may import core/protocols, core/models and core/utils.',
       from: { path: '^src/common/' },
       to: { path: CORE_BASE },

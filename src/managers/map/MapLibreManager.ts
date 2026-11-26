@@ -176,6 +176,11 @@ export class MapLibreManager implements MapManager, MapViewModel {
   handleRegion(viewport: Viewport) {
     this.viewport.set(viewport);
   }
+  handleUserCamera() {
+    // Reported like a gesture, so the session hands the camera to the user.
+    const viewport = this.viewport.get();
+    if (viewport) this.viewport.set({ ...viewport, gesturing: true });
+  }
 }
 
 /** Motion entries with haloM turned into the layer's unit (points at zoom 0), in place. */

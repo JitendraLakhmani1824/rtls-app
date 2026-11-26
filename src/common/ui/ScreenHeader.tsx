@@ -3,55 +3,57 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Chevron } from './icons';
-import { colors } from './theme';
+import { colors, typeScale } from './theme';
 
-/** A screen's top bar: back (if any), a large title, and an action on the right. */
+/**
+ * A screen's top: a row with back (or `left`, e.g. your avatar) and an action on the right, then a
+ * large title and a subtitle.
+ */
 export function ScreenHeader({
   title,
   subtitle,
   onBack,
+  left,
   right,
 }: {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  left?: ReactNode;
   right?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.bar, { paddingTop: insets.top + (onBack ? 4 : 12) }]}>
-      {onBack && (
-        <Pressable
-          onPress={onBack}
-          hitSlop={12}
-          style={styles.back}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Chevron color={colors.accent} size={11} />
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+    <View style={[styles.bar, { paddingTop: insets.top + 6 }]}>
+      <View style={styles.top}>
+        {onBack ? <BackButton onPress={onBack} /> : (left ?? <View />)}
+        {right}
+      </View>
+      {title !== '' && (
+        <Text style={styles.title} numberOfLines={2} accessibilityRole="header">
+          {title}
+        </Text>
       )}
-      {(title !== '' || right) && (
-        <View style={styles.row}>
-          <View style={styles.titles}>
-            <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
-              {title}
-            </Text>
-            {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={2}>
-                {subtitle}
-              </Text>
-            ) : null}
-          </View>
-          {right}
-        </View>
-      )}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
 
-/** A round "+" or short text action for the header. */
+export function BackButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      style={({ pressed }) => [styles.round, styles.back, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+    >
+      <Chevron color={colors.ink} size={10} />
+    </Pressable>
+  );
+}
+
+/** A round "+" or a short text action for the header's right side. */
 export function HeaderButton({
   label,
   onPress,
@@ -66,7 +68,10 @@ export function HeaderButton({
     <Pressable
       onPress={onPress}
       hitSlop={8}
-      style={({ pressed }) => [round ? styles.round : styles.pill, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        round ? [styles.round, styles.dark] : styles.pill,
+        pressed && styles.pressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={a11y}
     >
@@ -76,34 +81,32 @@ export function HeaderButton({
 }
 
 const styles = StyleSheet.create({
-  bar: { paddingHorizontal: 20, paddingBottom: 12, backgroundColor: colors.page },
-  back: {
+  bar: { paddingHorizontal: 20, paddingBottom: 14, backgroundColor: colors.page, gap: 4 },
+  top: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    marginBottom: 10,
   },
-  backText: { fontSize: 16, color: colors.accent, fontWeight: '500' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  titles: { flex: 1 },
-  title: { fontSize: 30, fontWeight: '800', color: colors.ink, letterSpacing: -0.6 },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 2 },
+  title: typeScale.title,
+  subtitle: { fontSize: 15, color: colors.muted, lineHeight: 21 },
   round: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.ink,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roundText: { fontSize: 24, color: '#ffffff', fontWeight: '500', marginTop: -2 },
+  back: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  dark: { backgroundColor: colors.ink },
+  roundText: { fontSize: 24, color: '#FFFFFF', fontWeight: '400', marginTop: -2 },
   pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: colors.ink,
   },
-  pillText: { fontSize: 14, color: '#ffffff', fontWeight: '700' },
-  pressed: { opacity: 0.8 },
+  pillText: { fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
+  pressed: { opacity: 0.75 },
 });

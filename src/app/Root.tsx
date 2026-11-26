@@ -1,5 +1,6 @@
 import { ManagersProvider } from '@common/di';
 import type { RootStack } from '@common/navigation';
+import { OnboardingScreen } from '@features/onboarding';
 import { RungAScreen, RungBCScreen } from '@lab/ladder';
 import { NavigationContainer, type InitialState } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
@@ -19,8 +20,9 @@ export function Root() {
   const launch = useLaunch();
   const [app] = useState(createApp);
   useEffect(() => app.start(), [app]);
-  const { loaded } = app.screens.sessions;
+  const { loaded, profile } = app.screens.sessions;
   const ready = useSyncExternalStore(loaded.subscribe, loaded.get);
+  const { onboarded } = useSyncExternalStore(profile.subscribe, profile.get);
   if (!launch.ready) return null;
   const params = launch.params;
   // A new scenario rebuilds everything from scratch (the key changes).
@@ -50,6 +52,17 @@ export function Root() {
     );
   }
   if (!ready) return null; // the saved book loads in a few milliseconds
+  // First launch: onboarding, then the app. A link that opened the app is handled right after.
+  if (!onboarded && !params) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <ManagersProvider value={app.screens}>
+          <OnboardingScreen />
+        </ManagersProvider>
+      </SafeAreaProvider>
+    );
+  }
   return <AppShell key={params ? paramsKey(params) : 'app'} app={app} scenario={params} />;
 }
 

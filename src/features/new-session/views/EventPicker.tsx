@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     marginBottom: 10,
   },
-  eventOn: { borderColor: colors.accent, backgroundColor: '#f5f9ff' },
+  eventOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   icon: {
     width: 44,
     height: 44,
@@ -65,5 +65,5 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '700', color: colors.ink },
   detail: { fontSize: 13, color: colors.muted, marginTop: 2 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.faint },
-  radioOn: { borderColor: colors.accent, borderWidth: 7 },
+  radioOn: { borderColor: colors.ink, borderWidth: 7 },
 });

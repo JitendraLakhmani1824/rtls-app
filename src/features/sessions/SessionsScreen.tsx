@@ -1,7 +1,8 @@
-import { colors, HeaderButton, PrimaryButton, ScreenHeader } from '@common/ui';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Avatar, colors, HeaderButton, ScreenHeader, TAB_BAR_SPACE } from '@common/ui';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useSessions, type SessionCard } from './useSessions';
+import { useSessions, type SessionCard } from './hooks/useSessions';
+import { EmptySessions } from './views/EmptySessions';
 import { SessionCardView } from './views/SessionCardView';
 
 /** Your sessions, newest first. */
@@ -14,15 +15,25 @@ export function SessionsScreen() {
     ]);
   const more = (card: SessionCard) =>
     Alert.alert(card.title, undefined, [
-      { text: 'Invite people', onPress: () => s.invite(card.id) },
+      ...(card.canInvite ? [{ text: 'Invite people', onPress: () => s.invite(card.id) }] : []),
       { text: 'Leave session', style: 'destructive', onPress: () => confirmLeave(card) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   return (
     <View style={styles.fill}>
       <ScreenHeader
-        title="Sessions"
+        title={s.greeting}
         subtitle="Live maps with your family and friends"
+        left={
+          <Pressable
+            onPress={s.openProfile}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Your profile"
+          >
+            <Avatar initials={s.me.initials} colour={colors.muted} photo={s.me.photo} size={44} />
+          </Pressable>
+        }
         right={<HeaderButton label="+" onPress={s.create} a11y="New session" />}
       />
       <FlatList
@@ -31,15 +42,7 @@ export function SessionsScreen() {
         renderItem={({ item }) => <SessionCardView card={item} onOpen={s.open} onMore={more} />}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={Gap}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No sessions yet</Text>
-            <Text style={styles.emptyText}>
-              Start one for an event and pick who’s coming, or open an invite link.
-            </Text>
-            <PrimaryButton label="New session" onPress={s.create} />
-          </View>
-        }
+        ListEmptyComponent={<EmptySessions onCreate={s.create} />}
         ListFooterComponent={
           s.cards.length > 0 ? (
             <Text style={styles.hint}>Got an invite link? Open it on this phone to join.</Text>
@@ -56,10 +59,7 @@ function Gap() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.page },
-  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  list: { paddingHorizontal: 16, paddingBottom: TAB_BAR_SPACE + 16 },
   gap: { height: 12 },
-  empty: { paddingTop: 40, paddingHorizontal: 8, gap: 10 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, textAlign: 'center' },
-  emptyText: { fontSize: 15, color: colors.muted, textAlign: 'center', marginBottom: 12 },
   hint: { fontSize: 13, color: colors.faint, textAlign: 'center', marginTop: 20 },
 });

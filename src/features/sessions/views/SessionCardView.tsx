@@ -2,7 +2,7 @@ import { Avatar, Chevron, colors, radius } from '@common/ui';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { SessionCard } from '../useSessions';
+import type { SessionCard } from '../hooks/useSessions';
 
 /** One session: what it is, who's in it. Tap to open its map; ••• for invite and leave. */
 export const SessionCardView = memo(function SessionCardView({
@@ -59,7 +59,7 @@ export const SessionCardView = memo(function SessionCardView({
         </View>
         <View style={styles.open}>
           <Text style={styles.openText}>Open map</Text>
-          <Chevron color={colors.accent} size={7} direction="right" />
+          <Chevron color={colors.accentInk} size={7} direction="right" />
         </View>
       </View>
     </Pressable>
@@ -104,5 +104,5 @@ const styles = StyleSheet.create({
   },
   moreCountText: { fontSize: 12, fontWeight: '700', color: colors.muted },
   open: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  openText: { fontSize: 14, fontWeight: '700', color: colors.accent },
+  openText: { fontSize: 14, fontWeight: '600', color: colors.accentInk },
 });

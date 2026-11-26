@@ -48,4 +48,6 @@ export interface MapViewModel {
   handlePress(member: number): void;
   handleReady(ready: boolean): void;
   handleRegion(viewport: Viewport): void;
+  /** The user moved the camera without a gesture (e.g. tapped a group to zoom in). */
+  handleUserCamera(): void;
 }

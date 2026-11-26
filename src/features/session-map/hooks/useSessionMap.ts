@@ -2,7 +2,7 @@ import { useConnection, useManagers, useRows, useSelected } from '@common/di';
 import type { RootStack } from '@common/navigation';
 import { EVENTS } from '@common/ui';
 import { formatClock, inviteMessage } from '@common/utils';
-import { Presence } from '@core/models';
+import { MAX_FRIENDS, Presence } from '@core/models';
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
@@ -73,12 +73,12 @@ export function useSessionMap() {
     showPanel: selected === null,
     listOpen,
     toggleList: () => setListOpen((open) => !open),
-    /** Saved sessions can invite; a measurement scenario can't. */
-    canInvite: record !== undefined,
+    /** Saved sessions can invite, up to what a link can carry; a measurement scenario can't. */
+    canInvite: record !== undefined && record.people.length <= MAX_FRIENDS + 1,
     invite: () => {
       const url = sessions.inviteUrl(id);
       if (!url) return;
-      void Share.share({ message: inviteMessage(sessions.myName.get(), title, url) });
+      void Share.share({ message: inviteMessage(sessions.profile.get().name, title, url) });
     },
     back: () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Tabs')),
   };

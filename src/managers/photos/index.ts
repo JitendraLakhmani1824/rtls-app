@@ -1,0 +1,1 @@
+export { ExpoPhotoManager } from './ExpoPhotoManager';

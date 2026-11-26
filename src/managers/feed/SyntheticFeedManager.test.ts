@@ -63,6 +63,15 @@ describe('SyntheticFeedManager', () => {
     expect(Math.min(...history.map((f) => f[4] ?? 0))).toBe(t0 - 300_000);
   });
 
+  it('sends history to a large saved session when asked, so its trails show at once', () => {
+    const historyOf = (history: boolean) => {
+      const { fixes, t0 } = run({ ...options('marathon', 150), history }, 0);
+      return fixes.filter((f) => (f[4] ?? 0) < t0).length;
+    };
+    expect(historyOf(false)).toBe(0);
+    expect(historyOf(true)).toBeGreaterThan(5000); // everyone moving, every 5 s for 5 min
+  });
+
   it('sends no history to large sessions, which are for measuring', () => {
     const { fixes, t0 } = run(options('marathon', 200), 0);
     expect(fixes.filter((f) => (f[4] ?? 0) < t0)).toHaveLength(0);

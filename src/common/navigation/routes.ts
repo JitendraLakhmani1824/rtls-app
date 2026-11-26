@@ -19,4 +19,6 @@ export type RootStack = {
   Friend: undefined;
   /** A person's page. */
   Person: { key: string };
+  /** Your photo and name. */
+  Profile: undefined;
 };

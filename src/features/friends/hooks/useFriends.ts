@@ -1,4 +1,4 @@
-import { useManagers, useMyName, usePeople, useSessionList } from '@common/di';
+import { useManagers, usePeople, useProfile, useSessionList } from '@common/di';
 import type { RootStack } from '@common/navigation';
 import type { Circle } from '@core/models';
 import { colourFor, initialsOf } from '@core/utils';
@@ -20,14 +20,13 @@ const CIRCLES: { circle: Circle; title: string }[] = [
   { circle: 'friends', title: 'Friends' },
 ];
 
-/** Everyone you know, your own name (shown on invites), and adding someone. */
+/** Everyone you know, you at the top (opens your profile), and adding someone. */
 export function useFriends() {
   const { sessions } = useManagers();
   const navigation = useNavigation<NativeStackNavigationProp<RootStack>>();
   const people = usePeople();
   const list = useSessionList();
-  const myName = useMyName();
-  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const profile = useProfile();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCircle, setNewCircle] = useState<Circle>('friends');
@@ -54,12 +53,12 @@ export function useFriends() {
   return {
     sections,
     count: people.length,
-    myName: nameDraft ?? myName,
-    editName: setNameDraft,
-    saveName: () => {
-      if (nameDraft !== null) sessions.setMyName(nameDraft);
-      setNameDraft(null);
+    me: {
+      name: profile.name || 'Add your name',
+      initials: initialsOf(profile.name || '?'),
+      photo: profile.photo,
     },
+    openProfile: () => navigation.navigate('Profile'),
     open: (key: string) => navigation.navigate('Person', { key }),
     adding,
     startAdding: () => setAdding(true),

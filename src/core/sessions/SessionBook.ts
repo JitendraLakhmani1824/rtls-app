@@ -6,6 +6,7 @@ import {
   type EventKind,
   type Invite,
   type Person,
+  type Profile,
   type SessionPerson,
   type SessionRecord,
 } from '../models';
@@ -15,9 +16,11 @@ import { cleanName, cleanTitle, inviteUrl, newCode, parseInvite } from './invite
 import { sampleBook } from './sample';
 
 const KEY = 'rtls.book';
-const VERSION = 1;
+/** v2 added the profile (photo, onboarded); v1 books are read too. */
+const VERSION = 2;
+const NO_PROFILE: Profile = { name: '', photo: null, onboarded: false };
 
-type Saved = { v: number; myName: string; people: Person[]; sessions: SessionRecord[] };
+type Saved = { v: number; profile: Profile; people: Person[]; sessions: SessionRecord[] };
 
 export type SessionBookDeps = { storage: Storage; clock: Clock; rng: Rng };
 
@@ -29,7 +32,7 @@ export class SessionBook implements Sessions {
   readonly loaded = createStore(false);
   readonly people = createStore<Person[]>([]);
   readonly list = createStore<SessionRecord[]>([]);
-  readonly myName = createStore('');
+  readonly profile = createStore<Profile>(NO_PROFILE);
   private loading: Promise<void> | null = null;
   private saving: Promise<void> = Promise.resolve();
 
@@ -40,7 +43,7 @@ export class SessionBook implements Sessions {
     this.loading ??= this.deps.storage.load(KEY).then((text) => {
       const saved = text === null ? null : readSaved(text);
       if (saved) {
-        this.myName.set(saved.myName);
+        this.profile.set(saved.profile);
         this.people.set(saved.people);
         this.list.set(saved.sessions);
       } else {
@@ -74,7 +77,7 @@ export class SessionBook implements Sessions {
       title: cleanTitle(input.title) || 'Session',
       event: input.event,
       people: [
-        { key: ME_KEY, name: this.myName.get() },
+        { key: ME_KEY, name: this.profile.get().name },
         ...chosen.map((p) => ({ key: p.key, name: p.name })),
       ],
       createdAt: this.deps.clock.now(),
@@ -111,7 +114,13 @@ export class SessionBook implements Sessions {
       people: members,
       createdAt: this.deps.clock.now(),
     };
-    if (this.myName.get() === '') this.myName.set(invite.names[as] ?? '');
+    // Joining from a link is a way in: you've said who you are, so there's no onboarding to do.
+    const profile = this.profile.get();
+    this.profile.set({
+      ...profile,
+      name: profile.name || (invite.names[as] ?? ''),
+      onboarded: true,
+    });
     this.people.set(people);
     this.list.set([record, ...this.list.get()]);
     this.save();
@@ -137,16 +146,22 @@ export class SessionBook implements Sessions {
     return person;
   }
 
-  setMyName(name: string) {
-    const clean = cleanName(name);
-    if (clean === this.myName.get()) return;
-    this.myName.set(clean);
+  updateProfile(change: Partial<Profile>) {
+    const prev = this.profile.get();
+    const next: Profile = {
+      name: change.name === undefined ? prev.name : cleanName(change.name),
+      photo: change.photo === undefined ? prev.photo : change.photo,
+      onboarded: change.onboarded ?? prev.onboarded,
+    };
+    if (next.name === prev.name && next.photo === prev.photo && next.onboarded === prev.onboarded)
+      return;
+    this.profile.set(next);
     this.save();
   }
 
   inviteUrl(id: string): string {
     const record = this.get(id);
-    return record ? inviteUrl(record, this.myName.get()) : '';
+    return record ? inviteUrl(record, this.profile.get().name) : '';
   }
 
   private freshCode(): string {
@@ -165,7 +180,7 @@ export class SessionBook implements Sessions {
   private save() {
     const saved: Saved = {
       v: VERSION,
-      myName: this.myName.get(),
+      profile: this.profile.get(),
       people: this.people.get(),
       sessions: this.list.get(),
     };
@@ -182,11 +197,11 @@ function readSaved(text: string): Saved | null {
   } catch {
     return null;
   }
-  if (!isObject(data) || data.v !== VERSION) return null;
+  if (!isObject(data) || (data.v !== 1 && data.v !== VERSION)) return null;
   if (!Array.isArray(data.people) || !Array.isArray(data.sessions)) return null;
   return {
     v: VERSION,
-    myName: typeof data.myName === 'string' ? cleanName(data.myName) : '',
+    profile: readProfile(data),
     people: data.people.filter(isPerson),
     sessions: data.sessions.filter(isSession),
   };
@@ -211,3 +226,15 @@ const isSession = (v: unknown): v is SessionRecord =>
   v.people.length >= 1 &&
   v.people.every((p) => isObject(p) && typeof p.key === 'string' && typeof p.name === 'string') &&
   v.people.filter((p) => isObject(p) && p.key === ME_KEY).length === 1;
+
+/** v2 keeps a profile; v1 kept only your name (and had no onboarding). */
+function readProfile(data: Record<string, unknown>): Profile {
+  const p = isObject(data.profile) ? data.profile : {};
+  const name =
+    typeof p.name === 'string' ? p.name : typeof data.myName === 'string' ? data.myName : '';
+  return {
+    name: cleanName(name),
+    photo: typeof p.photo === 'string' ? p.photo : null,
+    onboarded: p.onboarded === true,
+  };
+}

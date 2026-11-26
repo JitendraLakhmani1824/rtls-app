@@ -58,3 +58,6 @@ export function useDetail() {
     },
   };
 }
+
+/** The selected friend, ready to show. */
+export type DetailFriend = NonNullable<ReturnType<typeof useDetail>['friend']>;

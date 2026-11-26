@@ -44,13 +44,12 @@ describe('useFriends', () => {
     expect(result.current.sections[0]?.data.map((p) => p.name)).toContain('Sam');
   });
 
-  it('saves your name when you finish typing it', async () => {
+  it('shows you at the top, with your photo, and opens your profile', async () => {
     const { managers, result } = await setup();
-    await act(() => result.current.editName('Asha'));
-    expect(managers.sessions.myName.get()).toBe('');
-    await act(() => result.current.saveName());
-    expect(managers.sessions.myName.get()).toBe('Asha');
-    expect(result.current.myName).toBe('Asha');
+    await act(() => managers.sessions.updateProfile({ name: 'Asha', photo: 'file:///me.jpg' }));
+    expect(result.current.me).toEqual({ name: 'Asha', initials: 'A', photo: 'file:///me.jpg' });
+    await act(() => result.current.openProfile());
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Profile');
   });
 
   it('opens a person’s page by route name', async () => {

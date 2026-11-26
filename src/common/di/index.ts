@@ -4,7 +4,7 @@ export {
   useLive,
   useLiveRow,
   useManagers,
-  useMyName,
+  useProfile,
   usePeople,
   useRows,
   useSelected,

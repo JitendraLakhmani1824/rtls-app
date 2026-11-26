@@ -9,6 +9,7 @@ import { PerfRecorder } from '@lab/perf';
 import { ExpoDeviceManager } from '@managers/device';
 import { SCENARIOS, SyntheticFeedManager, withFaults } from '@managers/feed';
 import { MapLibreManager } from '@managers/map';
+import { ExpoPhotoManager } from '@managers/photos';
 import { AsyncStorageManager } from '@managers/storage';
 
 import { DEFAULT_PARAMS, type LaunchParams } from './launch-params';
@@ -30,6 +31,8 @@ type LiveOptions = {
   /** Who's in it, in order; default: synthetic names. */
   people?: readonly { key: string; name: string }[];
   meIndex?: number;
+  /** Trails on open whatever the size (saved sessions); measurement runs keep the feed's default. */
+  history?: boolean;
   intro: boolean;
 };
 
@@ -50,6 +53,7 @@ function createLive(
       center: VENUE,
       people: options.people,
       meIndex: options.meIndex,
+      history: options.history,
     },
     device.clock,
   );
@@ -107,6 +111,7 @@ function liveFor(record: SessionRecord, device: DeviceManager): Live {
         record.people.findIndex((p) => p.key === ME_KEY),
       ),
       intro: true,
+      history: true,
     },
   );
 }
@@ -172,7 +177,7 @@ export function createApp(): App {
   });
 
   return {
-    screens: { sessions, live },
+    screens: { sessions, live, photos: new ExpoPhotoManager() },
     start() {
       const stopWatch = device.watch();
       void sessions.load();

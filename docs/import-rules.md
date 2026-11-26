@@ -18,6 +18,7 @@ An import is allowed only if one of these rules allows it. Anything else fails `
 | `managers-map-libraries` | managers/map is the only folder that may import MapLibre (plus React, React Native, Reanimated and the bundled map style). |
 | `managers-device-libraries` | managers/device is the only folder that may import expo-battery and modules/rtls-thermal (plus React Native). |
 | `managers-storage-libraries` | managers/storage is the only folder that may import AsyncStorage. |
+| `managers-photos-libraries` | managers/photos is the only folder that may import the image picker and file system. |
 | `common-core` | common/* may import core/protocols, core/models and core/utils. |
 | `common-ui-utils` | common/ui may import common/utils. |
 | `common-libraries` | common/* may import React, React Native, React Navigation types and safe-area. |

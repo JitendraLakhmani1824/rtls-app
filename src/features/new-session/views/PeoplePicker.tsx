@@ -2,7 +2,7 @@ import { Avatar, Check, colors, radius } from '@common/ui';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { PickCircle, PickPerson } from '../useNewSession';
+import type { PickCircle, PickPerson } from '../hooks/useNewSession';
 
 /** Family and friends as checklists, each with "Select all". */
 export function PeoplePicker({
@@ -56,7 +56,7 @@ const Row = memo(function Row({
       <Avatar initials={person.initials} colour={person.colour} size={36} />
       <Text style={styles.name}>{person.name}</Text>
       <View style={[styles.box, person.chosen && styles.boxOn]}>
-        {person.chosen && <Check color="#ffffff" size={12} />}
+        {person.chosen && <Check color={colors.ink} size={12} />}
       </View>
     </Pressable>
   );
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   circle: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  all: { fontSize: 14, fontWeight: '600', color: colors.accent },
+  all: { fontSize: 14, fontWeight: '600', color: colors.accentInk },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

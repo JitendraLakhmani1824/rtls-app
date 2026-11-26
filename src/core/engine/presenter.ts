@@ -19,8 +19,11 @@ export const CLUSTER_MAX_ZOOM = 15;
 export const MIN_GLIDE_PX_PER_S = 2;
 /** …but a pin already gliding keeps gliding down to this, so GPS noise doesn't flip it back and forth. */
 export const KEEP_GLIDE_PX_PER_S = 1;
-/** Above this many friends on screen, only the selected friend's trail is drawn. */
-export const TRAILS_FOR_ALL_MAX = 30;
+/**
+ * Above this many friends in view, only the selected friend's trail is drawn. "In view" includes
+ * the margin around the screen (1.5×), so 60 is about 20–25 friends actually on screen.
+ */
+export const TRAILS_FOR_ALL_MAX = 60;
 const ENTER_PAD = 1.5;
 const LEAVE_PAD = 1.8;
 const MIN_GLIDE_MS = 500;

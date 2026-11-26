@@ -4,35 +4,39 @@ from common import box, arrow, DEFS, CSS, esc
 
 W = 1880
 BANDS = [
-    ('app/ — composition root', '#334155', '#f8fafc', 95, [
-        ('container.ts', ['the only place managers are created']),
-        ('Root', ['start page ↔ session · deep links']),
-        ('navigation', ['Home + Friend (native form sheet)']),
+    ('app/ — composition root', '#334155', '#f8fafc', 108, [
+        ('container.ts', ['managers created here only;', 'one engine per opened session']),
+        ('Root', ['tabs app · scenario links', '(measurement) open a map']),
+        ('navigation · linking', ['2 tabs + native stack', 'rtls://join/… · session/…']),
     ]),
-    ('features/ — screens · see only { session, MapView }', '#db2777', '#fdf2f8', 95, [
-        ('Start', ['event + 1–20 friends']),
-        ('Home', ['map · title card · friends panel']),
-        ('Detail', ['native sheet: status, distance, direction']),
+    ('features/ — screens · see only { sessions, live, photos }', '#db2777', '#fdf2f8', 95, [
+        ('Onboarding · Profile', ['name · photo']),
+        ('Sessions · Friends', ['the two tabs']),
+        ('New session · Join', ['pick people · link']),
+        ('Session map', ['map · Invite · friends']),
+        ('Detail · Person', ['sheet → full page']),
     ]),
-    ('common/ — shared by screens', '#7c3aed', '#f5f3ff', 95, [
-        ('di', ['useRows · useSelected · useConnection']),
-        ('ui', ['Avatar · StatusChip · theme']),
+    ('common/ — shared by screens', '#7c3aed', '#f5f3ff', 108, [
+        ('di', ['useLive · useRows · useSelected', 'useSessionList · usePeople']),
+        ('ui', ['palette tokens · TabBar', 'Avatar (photos) · header']),
         ('utils', ['"350 m NE" · "2 min ago"']),
     ]),
     ('core/ — pure TypeScript, no React · time from Clock, randomness from seeded Rng', '#059669', '#ecfdf5', 118, [
         ('models', ['FixBatch · PinFrame', 'MotionFrame · TrailFrame']),
-        ('protocols', ['Feed · Map · Device', 'Session · Clock']),
-        ('engine', ['LiveSession · Presenter', 'Location + Trail stores']),
+        ('protocols', ['Feed · Map · Device', 'Sessions · Storage · Photos']),
+        ('engine', ['LiveSession · stores', 'Presenter · Camera']),
+        ('sessions', ['SessionBook: profile,', 'people, sessions · invites']),
         ('sharing', ['GPS + send rate', 'by speed + watchers']),
     ]),
-    ('managers/ — talk to the outside world, behind protocols', '#2563eb', '#eff6ff', 95, [
+    ('managers/ — talk to the outside world, behind protocols', '#2563eb', '#eff6ff', 108, [
         ('map', ['MapLibre + Reanimated worklet']),
         ('feed', ['synthetic friends + faults']),
-        ('device', ['clock · AppState · expo-battery']),
+        ('device', ['clock · AppState · battery', 'Reduce Motion']),
+        ('storage · photos', ['AsyncStorage', 'image picker → app files']),
     ]),
 ]
 
-layers = ['<svg width="900" height="590" viewBox="0 0 900 590" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Helvetica, Arial, sans-serif">', DEFS,
+layers = ['<svg width="900" height="632" viewBox="0 0 900 632" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Helvetica, Arial, sans-serif">', DEFS,
           '<text x="10" y="18" font-size="14" font-weight="700" fill="#64748b" letter-spacing="0.6">APP LAYERS</text>']
 y = 30
 for title, stroke, fill, h, mods in BANDS:
@@ -50,8 +54,8 @@ for title, stroke, fill, h, mods in BANDS:
         for k, line in enumerate(lines):
             layers.append(f'<text x="{bx + 10:.0f}" y="{by + 39 + k * 17}" font-size="12.5" fill="#475569">{esc(line)}</text>')
     y += h + 12
-layers.append(arrow([(872, 40), (872, 570)], color='#94a3b8'))
-layers.append('<text x="890" y="305" font-size="12.5" font-weight="700" fill="#64748b" text-anchor="middle" transform="rotate(90 890 305)">imports point down only · checked by dependency-cruiser + ESLint</text>')
+layers.append(arrow([(872, 40), (872, 612)], color='#94a3b8'))
+layers.append('<text x="890" y="326" font-size="12.5" font-weight="700" fill="#64748b" text-anchor="middle" transform="rotate(90 890 326)">imports point down only · checked by dependency-cruiser + ESLint</text>')
 layers.append('</svg>')
 
 p = ['<svg width="930" height="605" viewBox="0 0 930 605" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Helvetica, Arial, sans-serif">', DEFS,
@@ -96,12 +100,13 @@ html = f'''<!doctype html><html><head><meta charset="utf-8"><style>{CSS.replace(
 <li><b>Running</b> = app in the foreground <b>and</b> map ready. Otherwise <b>Paused</b>: feed stopped (cursor kept), no timers, nothing drawn</li>
 <li>Per batch: ingest → trails → visibility → motion for gliding friends</li>
 <li><b>1 Hz tick:</b> presence · who glides · trails · still pins · camera · friend rows</li>
-<li>start() returns stop(), safe to run again; navigation focus ignored, so the sheet never pauses the map</li></ul></div>
-<div class="card"><h3>Camera and selection</h3><ul>
-<li><b>Fit:</b> frames every friend at start; re-fits when someone leaves the view</li>
-<li><b>Follow:</b> selecting a friend zooms to ≥ 16 and re-centres when they move 15% of the view</li>
-<li><b>Free:</b> any gesture — the camera is the user's</li>
-<li>Selection lives only in the session: the sheet opens when <i>selected</i> is set; dismissing clears it</li></ul></div>
+<li>start() returns stop(), safe to run again; navigation focus ignored, so the sheet never pauses the map</li>
+<li>Only the session whose map is open runs; the others cost nothing</li></ul></div>
+<div class="card"><h3>Camera (native animations, no JS per frame)</h3><ul>
+<li><b>Fit:</b> a new map flies in from the city and frames everyone; re-fits when someone leaves the view</li>
+<li><b>Follow:</b> selecting flies to the friend (zoom ≥ 16), then each fix sends a linear move with the pin's own target and duration; faster than 2 m/s it tilts 45° and turns to their heading</li>
+<li><b>Free:</b> any gesture — the camera is the user's · <b>Calm</b> under Low Power Mode or Reduce Motion</li>
+<li>Following costs no extra map frames (OnePlus 10T: 49 vs 48 frames/s)</li></ul></div>
 <div class="card"><h3>Animation budget (viewing phone)</h3>
 <table><tr><th>Condition</th><th>Gliding pins</th><th>Frame cap</th></tr>
 <tr><td>Normal</td><td>30</td><td>60 fps</td></tr>
@@ -121,7 +126,7 @@ html = f'''<!doctype html><html><head><meta charset="utf-8"><style>{CSS.replace(
 <li>Next step if JS glide &gt; 4 ms/frame p95 or &gt; 1% late frames: a native animator (CADisplayLink / Choreographer) behind the same <b>MapManager</b> protocol</li>
 <li>Heat signal: a small native module behind <b>DeviceManager.power</b></li></ul></div>
 <div class="card"><h3>Quality gates and numbers</h3><ul>
-<li><b>152 tests:</b> unit, feed + clock contracts, replay fingerprint, golden encoders, screen hooks; <b>pnpm verify</b> on every change</li>
+<li><b>229 tests:</b> unit, feed + clock + storage contracts, replay fingerprint, golden encoders, screen hooks, deep links; <b>pnpm verify</b> on every change</li>
 <li>Fakes + virtual time: no real timers or network in tests</li>
 <li>OnePlus 10T, 200 friends: marker-per-friend app UI ~5 fps; ours draws the map 2.5× less often; glide gaps ≤ 33.5 ms; JS 58–60 fps</li></ul></div>
 </div>

@@ -169,7 +169,7 @@ Most code is written with LLMs. The setup is lean on text and strong on automati
 | `docs/import-rules.md` | Generated from the dependency-cruiser allow-list; the only place the import table is written |
 | `src/core/engine/CLAUDE.md` | The fast lane: invariants, start-here file, tests to keep green |
 | `src/managers/map/CLAUDE.md` | Four sources, update path, fonts, iOS vs Android, sheet constraints |
-| `src/features/CLAUDE.md` | Screen shape (`XScreen` + `useX`), what a screen may see, selection flow |
+| `src/features/CLAUDE.md` | Screen shape (`XScreen`, `hooks/`, `views/`), what a screen may see, selection flow |
 | `.claude/rules/core.md` (`paths: src/core/**`) | No React/Expo; Clock and Rng only; typed arrays on hot paths; protocols state their promises |
 | `.claude/rules/views.md` (`paths: src/features/**`) | Screens see `{ session, MapView }` only; props-in views; memoised rows |
 | `.claude/rules/tests.md` (`paths: **/*.test.ts(x)`) | Behaviour names; fakes and virtual time; no real timers or network |

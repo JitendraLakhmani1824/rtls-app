@@ -11,6 +11,7 @@ import type {
   Invite,
   Member,
   Person,
+  Profile,
   SessionRecord,
   MotionFrame,
   PinFrame,
@@ -145,8 +146,8 @@ export interface Sessions {
   readonly people: Readable<Person[]>;
   /** Your sessions, newest first. */
   readonly list: Readable<SessionRecord[]>;
-  /** Your name, as invites show it ('' until you set it). */
-  readonly myName: Readable<string>;
+  /** You: name (as invites show it, '' until set), photo, and whether onboarding is done. */
+  readonly profile: Readable<Profile>;
   get(id: string): SessionRecord | undefined;
   /** Starts a session with you and these people (keys from `people`). */
   create(input: { title: string; event: EventKind; people: string[] }): SessionRecord;
@@ -159,9 +160,23 @@ export interface Sessions {
   join(invite: Invite, as: number): SessionRecord;
   remove(id: string): void;
   addPerson(name: string, circle: Circle): Person;
-  setMyName(name: string): void;
+  /** Changes any of your name, photo and onboarded flag. */
+  updateProfile(change: Partial<Profile>): void;
   /** The link that invites someone into this session. */
   inviteUrl(id: string): string;
+}
+
+// ── Photos ───────────────────────────────────────────────────────────────────────
+
+/** The phone's photos. A picked photo is copied into the app's own storage, so it outlives the picker's cache. */
+export interface Photos {
+  /**
+   * Lets the user pick a photo from the library or take one, cropped square. Resolves to a local
+   * file URI, or null if they cancelled or the phone refused. Never throws.
+   */
+  pick(from: 'library' | 'camera'): Promise<string | null>;
+  /** Deletes a photo this app saved. Never throws. */
+  remove(uri: string): Promise<void>;
 }
 
 // ── Storage ──────────────────────────────────────────────────────────────────────

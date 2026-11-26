@@ -16,7 +16,14 @@ describe('SessionBook', () => {
     const { book, storage } = await setup();
     expect(book.loaded.get()).toBe(true);
     expect(book.people.get().map((p) => p.circle)).toContain('family');
-    expect(book.list.get().map((s) => s.event)).toEqual(['trip', 'marathon', 'concert']);
+    expect(book.list.get().map((s) => s.event)).toEqual([
+      'trip',
+      'marathon',
+      'marathon',
+      'concert',
+    ]);
+    expect(book.list.get()[1]?.people).toHaveLength(150); // the running club: shows grouping
+    expect(book.profile.get()).toEqual({ name: '', photo: null, onboarded: false });
     await book.saved();
     expect(storage.saves).toBe(1);
   });
@@ -39,12 +46,12 @@ describe('SessionBook', () => {
   it('keeps everything after a restart', async () => {
     const { book, storage } = await setup();
     const record = book.create({ title: 'Beach day', event: 'trip', people: ['dad'] });
-    book.setMyName('Asha');
+    book.updateProfile({ name: 'Asha', photo: 'file:///me.jpg', onboarded: true });
     book.addPerson('Sam', 'friends');
     await book.saved();
     const { book: again } = await setup(storage);
     expect(again.get(record.id)).toEqual(record);
-    expect(again.myName.get()).toBe('Asha');
+    expect(again.profile.get()).toEqual({ name: 'Asha', photo: 'file:///me.jpg', onboarded: true });
     expect(again.people.get().map((p) => p.name)).toContain('Sam');
   });
 
@@ -52,7 +59,7 @@ describe('SessionBook', () => {
     const storage = new MemoryStorage();
     storage.data.set('rtls.book', '{not json');
     const { book } = await setup(storage);
-    expect(book.list.get()).toHaveLength(3);
+    expect(book.list.get()).toHaveLength(4);
   });
 
   it('drops saved entries that don’t make sense and keeps the rest', async () => {
@@ -63,7 +70,7 @@ describe('SessionBook', () => {
     saved.people.push({ key: 'x' });
     storage.data.set('rtls.book', JSON.stringify(saved));
     const { book: again } = await setup(storage);
-    expect(again.list.get()).toHaveLength(3);
+    expect(again.list.get()).toHaveLength(4);
     expect(again.people.get()).toHaveLength(book.people.get().length);
   });
 
@@ -73,7 +80,7 @@ describe('SessionBook', () => {
     const { book } = await setup(storage);
     book.create({ title: 'x', event: 'trip', people: ['mom'] });
     await book.saved();
-    expect(book.list.get()).toHaveLength(4);
+    expect(book.list.get()).toHaveLength(5);
   });
 
   describe('joining from a link', () => {
@@ -88,7 +95,8 @@ describe('SessionBook', () => {
       expect(record.people[1]?.name).toBe('Asha');
       const sam = book.people.get().find((p) => p.name === 'Sam');
       expect(sam).toMatchObject({ circle: 'friends', key: record.people[2]?.key });
-      expect(book.myName.get()).toBe('Asha'); // you hadn't set a name yet
+      // You hadn't set a name yet; and a link is a way in, so there's no onboarding left to do.
+      expect(book.profile.get()).toMatchObject({ name: 'Asha', onboarded: true });
     });
 
     it('opens the same session when joining twice', async () => {
@@ -112,6 +120,27 @@ describe('SessionBook', () => {
     const id = book.list.get()[0]?.id ?? '';
     book.remove(id);
     expect(book.get(id)).toBeUndefined();
-    expect(book.list.get()).toHaveLength(2);
+    expect(book.list.get()).toHaveLength(3);
+  });
+
+  it('reads a book saved before profiles existed, keeping the name and asking for onboarding', async () => {
+    const storage = new MemoryStorage();
+    storage.data.set(
+      'rtls.book',
+      JSON.stringify({ v: 1, myName: 'Asha', people: [], sessions: [] }),
+    );
+    const { book } = await setup(storage);
+    expect(book.profile.get()).toEqual({ name: 'Asha', photo: null, onboarded: false });
+  });
+
+  it('cleans the name you give and saves only real changes', async () => {
+    const { book, storage } = await setup();
+    await book.saved();
+    const saves = storage.saves;
+    book.updateProfile({ name: '  Asha,  K  ' });
+    expect(book.profile.get().name).toBe('Asha K');
+    book.updateProfile({ name: 'Asha K' });
+    await book.saved();
+    expect(storage.saves).toBe(saves + 1);
   });
 });
